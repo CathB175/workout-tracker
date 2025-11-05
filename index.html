@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Workout Tracker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; }
+        .modal-overlay { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; 
+            background: rgba(0,0,0,0.75) !important; z-index: 99999 !important; overflow-y: auto !important; padding: 20px !important; }
+        .modal-box { background: white !important; margin: 20px auto !important; padding: 24px !important; border-radius: 12px !important; 
+            max-width: 400px !important; box-shadow: 0 20px 50px rgba(0,0,0,0.3) !important; position: relative !important; z-index: 100000 !important; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { Calendar, Clock, ChevronRight, Plus, History, Home } = lucide;
+
+        function WorkoutTracker() {
+            const [view, setView] = useState('home');
+            const [selectedType, setSelectedType] = useState(null);
+            const [selectedCycle, setSelectedCycle] = useState(null);
+            const [selectedWorkout, setSelectedWorkout] = useState(null);
+            const [history, setHistory] = useState([]);
+            const [showForm, setShowForm] = useState(false);
+
+            useEffect(() => {
+                const saved = localStorage.getItem('workoutHistory');
+                if (saved) setHistory(JSON.parse(saved));
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('workoutHistory', JSON.stringify(history));
+            }, [history]);
+
+            const types = [
+                { id: 'hiit', name: 'HIIT', source: 'The Body Coach', hasCycles: true },
+                { id: 'yoga', name: 'Yoga', source: 'The Body Coach' },
+                { id: 'pilates', name: 'Pilates', source: 'The Body Coach' },
+                { id: 'smm', name: 'SMM', source: 'Simple Mobility Method' },
+                { id: 'stability', name: 'Stability Builder', source: 'SMM' },
+                { id: 'spf', name: 'SPF', source: 'Shoulder & Posture Fix' }
+            ];
+
+            const data = {
+                hiit: { cycles: [
+                    { id: 1, name: 'Cycle 1', sessions: [1,2,3,4,5] },
+                    { id: 2, name: 'Cycle 2', sessions: [1,2,3,4,5] },
+                    { id: 3, name: 'Cycle 3', sessions: [1,2,3,4,5] }
+                ]},
+                yoga: [
+                    { id: 'morning-flow', name: 'Morning Flow', duration: 20, info: 'Gentle morning sequence' },
+                    { id: 'power-yoga', name: 'Power Yoga', duration: 30, info: 'Strength building flow' },
+                    { id: 'evening-stretch', name: 'Evening Stretch', duration: 15, info: 'Relaxing wind down' }
+                ],
+                pilates: [
+                    { id: 'core', name: 'Core Strength', duration: 25, info: 'Core focused' },
+                    { id: 'full', name: 'Full Body', duration: 30, info: 'Complete session' }
+                ],
+                smm: [
+                    { id: 'daily', name: 'Daily Routine', duration: 15, info: 'Basic mobility' },
+                    { id: 'deep', name: 'Deep Work', duration: 30, info: 'Intensive session' }
+                ],
+                stability: [
+                    { id: 'foundation', name: 'Foundation', duration: 20, info: 'Basic stability' },
+                    { id: 'advanced', name: 'Advanced', duration: 25, info: 'Advanced exercises' }
+                ],
+                spf: [
+                    { id: 'shoulder', name: 'Shoulder Mobility', duration: 15, info: 'Shoulder work' },
+                    { id: 'posture', name: 'Posture Reset', duration: 20, info: 'Posture correction' }
+                ]
+            };
+
+            const getLast = (type, cycle = null, session = null) => {
+                const filtered = history.filter(h => {
+                    if (h.type !== type) return false;
+                    if (cycle && h.cycle !== cycle) return false;
+                    if (session && h.session !== session) return false;
+                    return true;
+                });
+                return filtered.sort((a,b) => new Date(b.date) - new Date(a.date))[0];
+            };
+
+            const getNext = (type) => {
+                const last = getLast(type);
+                if (!last) return { cycle: 1, session: 1 };
+                if (last.session < 5) return { cycle: last.cycle, session: last.session + 1 };
+                if (last.cycle < 3) return { cycle: last.cycle + 1, session: 1 };
+                return { cycle: 1, session: 1 };
+            };
+
+            const saveWorkout = (formData) => {
+                const newLog = {
+                    id: Date.now(),
+                    type: selectedType.id,
+                    typeName: selectedType.name,
+                    cycle: selectedCycle,
+                    session: selectedWorkout?.session || null,
+                    workoutId: selectedWorkout?.id || null,
+                    workoutName: selectedWorkout?.name || `Cycle ${selectedCycle} Session ${selectedWorkout?.session}`,
+                    ...formData
+                };
+                setHistory([newLog, ...history]);
+                setShowForm(false);
+                setView('home');
+                setSelectedType(null);
+                setSelectedCycle(null);
+                setSelectedWorkout(null);
+            };
+
+            function LogForm() {
+                const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+                const [duration, setDuration] = useState('');
+                const [notes, setNotes] = useState('');
+
+                return (
+                    <div className="modal-overlay" onClick={(e) => e.target.className.includes('modal-overlay') && setShowForm(false)}>
+                        <div className="modal-box">
+                            <h3 style={{fontSize: '22px', fontWeight: 'bold', marginBottom: '20px', paddingBottom: '15px', borderBottom: '2px solid #eee'}}>
+                                Log Workout
+                            </h3>
+                            <div style={{marginBottom: '16px'}}>
+                                <label style={{display: 'block', fontWeight: '600', marginBottom: '6px', fontSize: '14px'}}>Date</label>
+                                <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                                    style={{width: '100%', padding: '12px', border: '2px solid #ddd', borderRadius: '8px', fontSize: '16px'}} />
+                            </div>
+                            <div style={{marginBottom: '16px'}}>
+                                <label style={{display: 'block', fontWeight: '600', marginBottom: '6px', fontSize: '14px'}}>Duration (mins)</label>
+                                <input type="number" value={duration} onChange={e => setDuration(e.target.value)} placeholder="20"
+                                    style={{width: '100%', padding: '12px', border: '2px solid #ddd', borderRadius: '8px', fontSize: '16px'}} />
+                            </div>
+                            <div style={{marginBottom: '20px'}}>
+                                <label style={{display: 'block', fontWeight: '600', marginBottom: '6px', fontSize: '14px'}}>Notes</label>
+                                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="How did it feel?" rows="3"
+                                    style={{width: '100%', padding: '12px', border: '2px solid #ddd', borderRadius: '8px', fontSize: '16px'}} />
+                            </div>
+                            <div style={{display: 'flex', gap: '10px'}}>
+                                <button onClick={() => setShowForm(false)}
+                                    style={{flex: 1, padding: '14px', background: '#e5e7eb', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '16px'}}>
+                                    Cancel
+                                </button>
+                                <button onClick={() => saveWorkout({date, duration, notes})}
+                                    style={{flex: 1, padding: '14px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '16px'}}>
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div style={{minHeight: '100vh', background: '#f9fafb'}}>
+                    <div style={{background: '#3b82f6', color: 'white', padding: '16px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)'}}>
+                        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                            {view !== 'home' && (
+                                <button onClick={() => {
+                                    if (view === 'sessions') setView('cycles');
+                                    else if (view === 'cycles' || view === 'workouts') setView('home');
+                                    else if (view === 'history') setView('home');
+                                }} style={{color: 'white', background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer'}}>
+                                    ← Back
+                                </button>
+                            )}
+                            {view === 'home' && <div/>}
+                            <h1 style={{fontSize: '20px', fontWeight: 'bold'}}>Workout Tracker</h1>
+                            <div/>
+                        </div>
+                    </div>
+
+                    <div style={{paddingBottom: '80px'}}>
+                        {view === 'home' && (
+                            <div style={{padding: '24px'}}>
+                                <h1 style={{fontSize: '28px', fontWeight: 'bold', marginBottom: '8px'}}>What do you fancy doing?</h1>
+                                <p style={{color: '#6b7280', marginBottom: '32px'}}>Choose your workout type</p>
+                                {types.map(type => {
+                                    const last = getLast(type.id);
+                                    const next = type.id === 'hiit' ? getNext(type.id) : null;
+                                    return (
+                                        <button key={type.id} onClick={() => { setSelectedType(type); setView(type.hasCycles ? 'cycles' : 'workouts'); }}
+                                            style={{width: '100%', background: 'white', padding: '16px', borderRadius: '8px', border: '2px solid #f3f4f6', marginBottom: '12px', textAlign: 'left', cursor: 'pointer'}}>
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                                <div>
+                                                    <h3 style={{fontWeight: '600', fontSize: '18px'}}>{type.name}</h3>
+                                                    <p style={{fontSize: '14px', color: '#6b7280'}}>{type.source}</p>
+                                                    {last && <p style={{fontSize: '12px', color: '#9ca3af', marginTop: '4px'}}>
+                                                        Last: {new Date(last.date).toLocaleDateString()}{last.cycle && ` - Cycle ${last.cycle} Session ${last.session}`}
+                                                    </p>}
+                                                    {next && <p style={{fontSize: '12px', color: '#3b82f6', marginTop: '4px'}}>
+                                                        Next: Cycle {next.cycle} Session {next.session}
+                                                    </p>}
+                                                </div>
+                                                <ChevronRight color="#9ca3af" size={20} />
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {view === 'cycles' && (
+                            <div style={{padding: '24px'}}>
+                                <h2 style={{fontSize: '24px', fontWeight: 'bold', marginBottom: '8px'}}>{selectedType.name}</h2>
+                                <p style={{fontSize: '14px', color: '#6b7280', marginBottom: '24px'}}>
+                                    Next up: Cycle {getNext(selectedType.id).cycle} Session {getNext(selectedType.id).session}
+                                </p>
+                                {data.hiit.cycles.map(cycle => {
+                                    const last = getLast(selectedType.id, cycle.id);
+                                    return (
+                                        <button key={cycle.id} onClick={() => { setSelectedCycle(cycle.id); setView('sessions'); }}
+                                            style={{width: '100%', background: 'white', padding: '16px', borderRadius: '8px', border: '2px solid #f3f4f6', marginBottom: '12px', textAlign: 'left', cursor: 'pointer'}}>
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                                <div>
+                                                    <h3 style={{fontWeight: '600', fontSize: '18px'}}>{cycle.name}</h3>
+                                                    <p style={{fontSize: '14px', color: '#6b7280'}}>5 sessions</p>
+                                                    {last && <p style={{fontSize: '12px', color: '#9ca3af', marginTop: '4px'}}>
+                                                        Last: Session {last.session} - {new Date(last.date).toLocaleDateString()}
+                                                    </p>}
+                                                </div>
+                                                <ChevronRight color="#9ca3af" size={20} />
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {view === 'sessions' && (
+                            <div style={{padding: '24px'}}>
+                                <h2 style={{fontSize: '24px', fontWeight: 'bold', marginBottom: '8px'}}>Cycle {selectedCycle}</h2>
+                                <p style={{fontSize: '14px', color: '#6b7280', marginBottom: '24px'}}>Choose a session</p>
+                                {data.hiit.cycles.find(c => c.id === selectedCycle).sessions.map(session => {
+                                    const last = getLast(selectedType.id, selectedCycle, session);
+                                    return (
+                                        <button key={session} onClick={() => { setSelectedWorkout({session}); setShowForm(true); }}
+                                            style={{width: '100%', background: 'white', padding: '16px', borderRadius: '8px', border: '2px solid #f3f4f6', marginBottom: '12px', textAlign: 'left', cursor: 'pointer'}}>
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                                <div>
+                                                    <h3 style={{fontWeight: '600', fontSize: '18px'}}>Session {session}</h3>
+                                                    {last && <p style={{fontSize: '12px', color: '#9ca3af', marginTop: '4px'}}>
+                                                        Last: {new Date(last.date).toLocaleDateString()}{last.duration && ` - ${last.duration} mins`}
+                                                    </p>}
+                                                </div>
+                                                <Plus color="#3b82f6" size={20} />
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {view === 'workouts' && (
+                            <div style={{padding: '24px'}}>
+                                <h2 style={{fontSize: '24px', fontWeight: 'bold', marginBottom: '24px'}}>{selectedType.name}</h2>
+                                {data[selectedType.id].map(workout => {
+                                    const last = history.find(h => h.workoutId === workout.id);
+                                    return (
+                                        <button key={workout.id} onClick={() => { setSelectedWorkout(workout); setShowForm(true); }}
+                                            style={{width: '100%', background: 'white', padding: '16px', borderRadius: '8px', border: '2px solid #f3f4f6', marginBottom: '12px', textAlign: 'left', cursor: 'pointer'}}>
+                                            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                                <div style={{flex: 1}}>
+                                                    <h3 style={{fontWeight: '600', fontSize: '18px'}}>{workout.name}</h3>
+                                                    <p style={{fontSize: '14px', color: '#6b7280'}}>{workout.info}</p>
+                                                    <div style={{display: 'flex', gap: '12px', marginTop: '8px', fontSize: '12px', color: '#6b7280'}}>
+                                                        <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                                            <Clock size={12} /> {workout.duration} mins
+                                                        </span>
+                                                        {last && <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                                            <Calendar size={12} /> Last: {new Date(last.date).toLocaleDateString()}
+                                                        </span>}
+                                                    </div>
+                                                </div>
+                                                <Plus color="#3b82f6" size={20} />
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {view === 'history' && (
+                            <div style={{padding: '24px'}}>
+                                <h2 style={{fontSize: '24px', fontWeight: 'bold', marginBottom: '24px'}}>Workout History</h2>
+                                {history.length === 0 ? (
+                                    <p style={{color: '#6b7280', textAlign: 'center', marginTop: '32px'}}>No workouts logged yet</p>
+                                ) : (
+                                    history.map(w => (
+                                        <div key={w.id} style={{background: 'white', padding: '16px', borderRadius: '8px', border: '2px solid #f3f4f6', marginBottom: '12px'}}>
+                                            <h3 style={{fontWeight: '600'}}>{w.typeName}</h3>
+                                            <p style={{fontSize: '14px', color: '#6b7280'}}>{w.workoutName}</p>
+                                            <div style={{display: 'flex', gap: '12px', marginTop: '8px', fontSize: '12px', color: '#6b7280'}}>
+                                                <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                                    <Calendar size={12} /> {new Date(w.date).toLocaleDateString()}
+                                                </span>
+                                                {w.duration && <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                                    <Clock size={12} /> {w.duration} mins
+                                                </span>}
+                                            </div>
+                                            {w.notes && <p style={{fontSize: '14px', color: '#6b7280', marginTop: '8px', fontStyle: 'italic'}}>{w.notes}</p>}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div style={{position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderTop: '1px solid #e5e7eb', display: 'flex'}}>
+                        <button onClick={() => { setView('home'); setSelectedType(null); setSelectedCycle(null); setSelectedWorkout(null); }}
+                            style={{flex: 1, padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: view === 'home' ? '#3b82f6' : '#9ca3af'}}>
+                            <Home size={24} />
+                            <span style={{fontSize: '12px', marginTop: '4px'}}>Home</span>
+                        </button>
+                        <button onClick={() => setView('history')}
+                            style={{flex: 1, padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: view === 'history' ? '#3b82f6' : '#9ca3af'}}>
+                            <History size={24} />
+                            <span style={{fontSize: '12px', marginTop: '4px'}}>History</span>
+                        </button>
+                    </div>
+
+                    {showForm && <LogForm />}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<WorkoutTracker />);
+    </script>
+</body>
+</html>
