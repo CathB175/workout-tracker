@@ -12,12 +12,14 @@
         .back-btn { background: none; border: none; color: white; font-size: 16px; cursor: pointer; float: left; }
         .container { padding: 24px 24px 100px 24px; }
         .title { font-size: 28px; font-weight: bold; margin-bottom: 8px; }
-        .subtitle { color: #6b7280; margin-bottom: 32px; }
+        .subtitle { color: #6b7280; margin-bottom: 32px; font-size: 14px; }
         .card { background: white; padding: 16px; border-radius: 8px; border: 2px solid #f3f4f6; margin-bottom: 12px; cursor: pointer; }
         .card:active { background: #f9fafb; }
         .card h3 { font-weight: 600; font-size: 18px; margin-bottom: 4px; }
-        .card p { font-size: 14px; color: #6b7280; }
+        .card p { font-size: 14px; color: #6b7280; margin-bottom: 4px; }
         .card small { font-size: 12px; color: #9ca3af; display: block; margin-top: 4px; }
+        .card .equipment { font-size: 13px; color: #f59e0b; margin-top: 6px; font-weight: 500; }
+        .empty-state { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 15px; }
         .nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e5e7eb; display: flex; }
         .nav button { flex: 1; padding: 16px; background: none; border: none; color: #9ca3af; font-size: 12px; cursor: pointer; }
         .nav button.active { color: #3b82f6; }
@@ -25,6 +27,8 @@
         .modal.show { display: block; }
         .modal-content { background: white; margin: 20px auto; padding: 24px; border-radius: 12px; max-width: 400px; }
         .modal h3 { font-size: 22px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eee; }
+        .workout-details { background: #f9fafb; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+        .workout-details strong { display: block; margin-bottom: 4px; color: #111; }
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
         .form-group input, .form-group textarea { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; font-family: inherit; }
@@ -33,6 +37,11 @@
         .btn-cancel { background: #e5e7eb; color: #111; }
         .btn-save { background: #3b82f6; color: white; }
         .hidden { display: none; }
+        .history-card { background: white; padding: 14px; border-radius: 8px; border: 2px solid #f3f4f6; margin-bottom: 10px; }
+        .history-card h4 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+        .history-card .meta { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+        .history-card .notes { font-size: 14px; color: #374151; font-style: italic; background: #f9fafb; padding: 8px; border-radius: 6px; margin-top: 8px; }
+        .badge { display: inline-block; background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -61,6 +70,7 @@
 
     <div class="container hidden" id="workoutsView">
         <h2 class="title" id="workoutsTitle"></h2>
+        <p class="subtitle" id="workoutsSubtitle"></p>
         <div id="workoutsList"></div>
     </div>
 
@@ -72,17 +82,22 @@
     <div class="modal" id="logModal">
         <div class="modal-content">
             <h3>Log Workout</h3>
+            <div class="workout-details" id="workoutDetails"></div>
             <div class="form-group">
                 <label>Date</label>
                 <input type="date" id="logDate">
             </div>
             <div class="form-group">
                 <label>Duration (minutes)</label>
-                <input type="number" id="logDuration" placeholder="20">
+                <input type="number" id="logDuration" placeholder="25">
+            </div>
+            <div class="form-group">
+                <label>Equipment Used</label>
+                <input type="text" id="logEquipment" placeholder="Dumbbells, resistance band, etc.">
             </div>
             <div class="form-group">
                 <label>Notes</label>
-                <textarea id="logNotes" rows="3" placeholder="How did it feel?"></textarea>
+                <textarea id="logNotes" rows="3" placeholder="Weights used, how it felt, modifications..."></textarea>
             </div>
             <div class="btn-group">
                 <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
@@ -110,41 +125,59 @@
         let history = JSON.parse(localStorage.getItem('workoutHistory') || '[]');
 
         const types = [
-            { id: 'hiit', name: 'HIIT', source: 'The Body Coach', hasCycles: true },
-            { id: 'yoga', name: 'Yoga', source: 'The Body Coach' },
-            { id: 'pilates', name: 'Pilates', source: 'The Body Coach' },
-            { id: 'smm', name: 'SMM', source: 'Simple Mobility Method' },
-            { id: 'stability', name: 'Stability Builder', source: 'SMM' },
-            { id: 'spf', name: 'SPF', source: 'Shoulder & Posture Fix' }
+            { id: 'hiit', name: 'HIIT', description: 'High-Intensity Interval Training from The Body Coach', hasCycles: true },
+            { id: 'strength', name: 'Strength in Menopause', description: 'Building strength and stability with The Body Coach' },
+            { id: 'barre', name: 'Barre', description: 'Define strength and lengthen with The Body Coach' },
+            { id: 'yoga-pilates', name: 'Yoga & Pilates', description: 'Flow and strengthen with The Body Coach' },
+            { id: 'smm', name: 'SMM', description: 'Simple Mobility Method for daily movements' },
+            { id: 'stability', name: 'Stability Builder', description: 'Build a solid core foundation and improve balance' },
+            { id: 'spf', name: 'SPF', description: 'Keeping your shoulders neck and upper back happy' }
         ];
 
         const data = {
-            hiit: { cycles: [
-                { id: 1, name: 'Cycle 1', sessions: [1,2,3,4,5] },
-                { id: 2, name: 'Cycle 2', sessions: [1,2,3,4,5] },
-                { id: 3, name: 'Cycle 3', sessions: [1,2,3,4,5] }
-            ]},
-            yoga: [
-                { id: 'morning-flow', name: 'Morning Flow', duration: 20, info: 'Gentle morning sequence' },
-                { id: 'power-yoga', name: 'Power Yoga', duration: 30, info: 'Strength building flow' },
-                { id: 'evening-stretch', name: 'Evening Stretch', duration: 15, info: 'Relaxing wind down' }
-            ],
-            pilates: [
-                { id: 'core', name: 'Core Strength', duration: 25, info: 'Core focused' },
-                { id: 'full', name: 'Full Body', duration: 30, info: 'Complete session' }
-            ],
-            smm: [
-                { id: 'daily', name: 'Daily Routine', duration: 15, info: 'Basic mobility' },
-                { id: 'deep', name: 'Deep Work', duration: 30, info: 'Intensive session' }
-            ],
-            stability: [
-                { id: 'foundation', name: 'Foundation', duration: 20, info: 'Basic stability' },
-                { id: 'advanced', name: 'Advanced', duration: 25, info: 'Advanced exercises' }
-            ],
-            spf: [
-                { id: 'shoulder', name: 'Shoulder Mobility', duration: 15, info: 'Shoulder work' },
-                { id: 'posture', name: 'Posture Reset', duration: 20, info: 'Posture correction' }
-            ]
+            hiit: {
+                cycles: [
+                    { 
+                        id: 1, 
+                        name: 'Cycle 1', 
+                        workouts: [
+                            { session: 1, name: 'Cycle 1 - Workout 1', info: 'HIIT 5 moves x 5 rounds 30s work 30s rest', duration: 25, equipment: '', notes: 'Good - all standing' },
+                            { session: 2, name: 'Cycle 1 - Workout 2', info: 'HIIT 5 moves x 5 rounds 30s work 30s rest', duration: 25, equipment: '', notes: '' },
+                            { session: 3, name: 'Cycle 1 - Workout 3', info: 'HIIT 6 moves x 4 rounds 30s work 30s rest', duration: 25, equipment: '', notes: '' },
+                            { session: 4, name: 'Cycle 1 - Workout 4', info: 'HIIT 8 moves x 3 rounds 30s work 30s rest', duration: 25, equipment: '', notes: '' },
+                            { session: 5, name: 'Cycle 1 - Workout 5', info: 'HIIT 12 moves x 2 rounds 30s work 30s rest', duration: 25, equipment: '', notes: '' }
+                        ]
+                    },
+                    { 
+                        id: 2, 
+                        name: 'Cycle 2', 
+                        workouts: [
+                            { session: 1, name: 'Cycle 2 - Workout 1', info: 'HIIT 10 moves x 3 rounds 30s work 30s rest', duration: 30, equipment: '', notes: '' },
+                            { session: 2, name: 'Cycle 2 - Workout 2', info: 'Cardio & Abs HIIT 10 moves x 3 rounds 30s work 30s rest', duration: 30, equipment: '', notes: '' },
+                            { session: 3, name: 'Cycle 2 - Workout 3', info: 'HIIT 15 moves x 2 rounds 30s work 30s rest', duration: 30, equipment: '', notes: '' },
+                            { session: 4, name: 'Cycle 2 - Workout 4', info: 'HIIT 5 moves x 6 rounds 30s work 30s rest', duration: 30, equipment: '', notes: '' },
+                            { session: 5, name: 'Cycle 2 - Workout 5', info: 'HIIT 7 moves x 4 rounds 30s work 30s rest', duration: 30, equipment: '', notes: '' }
+                        ]
+                    },
+                    { 
+                        id: 3, 
+                        name: 'Cycle 3', 
+                        workouts: [
+                            { session: 1, name: 'Cycle 3 - Workout 1', info: 'HIIT 10 moves x 3 rounds 35s work 25s rest', duration: 30, equipment: '', notes: '' },
+                            { session: 2, name: 'Cycle 3 - Workout 2', info: 'Lower Body 5 moves x 2 rounds - Upper Body 5 moves x 2 rounds 35s work 25s rest', duration: 30, equipment: '', notes: '' },
+                            { session: 3, name: 'Cycle 3 - Workout 3', info: 'HIIT 8 moves x 3 rounds 35s work 25s rest - Abs circuit 5 moves x 1 round 30s work 30s rest', duration: 30, equipment: '', notes: '' },
+                            { session: 4, name: 'Cycle 3 - Workout 4', info: 'Lower Body 5 moves x 2 rounds - Upper Body 5 moves x 2 rounds 30s work 30s rest - Cardio 5 moves x 2 rounds 30s work 30s rest', duration: 30, equipment: '', notes: '' },
+                            { session: 5, name: 'Cycle 3 - Workout 5', info: 'HIIT 15 moves x 2 rounds 35s work 25s rest then 40s work 20s rest', duration: 30, equipment: '', notes: '' }
+                        ]
+                    }
+                ]
+            },
+            strength: [],
+            barre: [],
+            'yoga-pilates': [],
+            smm: [],
+            stability: [],
+            spf: []
         };
 
         function getLast(type, cycle = null, session = null) {
@@ -172,6 +205,9 @@
         function showHome() {
             hideAll();
             currentView = 'home';
+            selectedType = null;
+            selectedCycle = null;
+            selectedWorkout = null;
             document.getElementById('homeView').classList.remove('hidden');
             document.getElementById('homeNavBtn').classList.add('active');
             document.getElementById('historyNavBtn').classList.remove('active');
@@ -193,7 +229,7 @@
                 if (next) nextText = `<small style="color: #3b82f6;">Next: Cycle ${next.cycle} Session ${next.session}</small>`;
                 return `<div class="card" onclick="selectType('${type.id}')">
                     <h3>${type.name}</h3>
-                    <p>${type.source}</p>
+                    <p>${type.description}</p>
                     ${lastText}${nextText}
                 </div>`;
             }).join('');
@@ -243,24 +279,27 @@
             document.getElementById('sessionsTitle').textContent = `Cycle ${selectedCycle}`;
             
             const list = document.getElementById('sessionsList');
-            const sessions = data.hiit.cycles.find(c => c.id === selectedCycle).sessions;
-            list.innerHTML = sessions.map(session => {
-                const last = getLast(selectedType.id, selectedCycle, session);
+            const cycle = data.hiit.cycles.find(c => c.id === selectedCycle);
+            list.innerHTML = cycle.workouts.map(workout => {
+                const last = getLast(selectedType.id, selectedCycle, workout.session);
                 let lastText = '';
                 if (last) {
                     lastText = `<small>Last: ${new Date(last.date).toLocaleDateString()}`;
                     if (last.duration) lastText += ` - ${last.duration} mins`;
                     lastText += '</small>';
                 }
-                return `<div class="card" onclick="selectSession(${session})">
-                    <h3>Session ${session}</h3>
+                return `<div class="card" onclick='selectSessionWorkout(${JSON.stringify(workout)})'>
+                    <h3>Session ${workout.session}</h3>
+                    <p>${workout.info}</p>
+                    ${workout.equipment ? `<div class="equipment">Equipment: ${workout.equipment}</div>` : ''}
+                    ${workout.notes ? `<div class="badge">Tip: ${workout.notes}</div>` : ''}
                     ${lastText}
                 </div>`;
             }).join('');
         }
 
-        function selectSession(session) {
-            selectedWorkout = { session };
+        function selectSessionWorkout(workout) {
+            selectedWorkout = workout;
             openModal();
         }
 
@@ -270,18 +309,26 @@
             document.getElementById('workoutsView').classList.remove('hidden');
             document.getElementById('backBtn').classList.remove('hidden');
             document.getElementById('workoutsTitle').textContent = selectedType.name;
+            document.getElementById('workoutsSubtitle').textContent = selectedType.description;
             
             const list = document.getElementById('workoutsList');
-            list.innerHTML = data[selectedType.id].map(workout => {
-                const last = history.find(h => h.workoutId === workout.id);
-                let lastText = '';
-                if (last) lastText = `<small>Last: ${new Date(last.date).toLocaleDateString()}</small>`;
-                return `<div class="card" onclick='selectWorkout(${JSON.stringify(workout)})'>
-                    <h3>${workout.name}</h3>
-                    <p>${workout.info} • ${workout.duration} mins</p>
-                    ${lastText}
-                </div>`;
-            }).join('');
+            const workouts = data[selectedType.id];
+            
+            if (!workouts || workouts.length === 0) {
+                list.innerHTML = '<div class="empty-state">No workouts added yet.<br>Add your workouts here when ready!</div>';
+            } else {
+                list.innerHTML = workouts.map(workout => {
+                    const last = history.find(h => h.workoutId === workout.id);
+                    let lastText = '';
+                    if (last) lastText = `<small>Last: ${new Date(last.date).toLocaleDateString()}</small>`;
+                    return `<div class="card" onclick='selectWorkout(${JSON.stringify(workout)})'>
+                        <h3>${workout.name}</h3>
+                        <p>${workout.info} • ${workout.duration} mins</p>
+                        ${workout.equipment ? `<div class="equipment">Equipment: ${workout.equipment}</div>` : ''}
+                        ${lastText}
+                    </div>`;
+                }).join('');
+            }
         }
 
         function selectWorkout(workout) {
@@ -291,8 +338,15 @@
 
         function openModal() {
             document.getElementById('logDate').value = new Date().toISOString().split('T')[0];
-            document.getElementById('logDuration').value = '';
+            document.getElementById('logDuration').value = selectedWorkout.duration || '';
+            document.getElementById('logEquipment').value = selectedWorkout.equipment || '';
             document.getElementById('logNotes').value = '';
+            
+            let detailsHtml = `<strong>${selectedWorkout.name || 'Session ' + selectedWorkout.session}</strong>`;
+            if (selectedWorkout.info) detailsHtml += `<div style="margin-top: 4px;">${selectedWorkout.info}</div>`;
+            if (selectedWorkout.notes) detailsHtml += `<div style="margin-top: 4px; color: #059669;">💡 ${selectedWorkout.notes}</div>`;
+            
+            document.getElementById('workoutDetails').innerHTML = detailsHtml;
             document.getElementById('logModal').classList.add('show');
         }
 
@@ -309,8 +363,10 @@
                 session: selectedWorkout?.session || null,
                 workoutId: selectedWorkout?.id || null,
                 workoutName: selectedWorkout?.name || `Cycle ${selectedCycle} Session ${selectedWorkout?.session}`,
+                workoutInfo: selectedWorkout?.info || '',
                 date: document.getElementById('logDate').value,
                 duration: document.getElementById('logDuration').value,
+                equipment: document.getElementById('logEquipment').value,
                 notes: document.getElementById('logNotes').value
             };
             history.unshift(newLog);
@@ -328,17 +384,22 @@
             
             const list = document.getElementById('historyList');
             if (history.length === 0) {
-                list.innerHTML = '<p style="text-align: center; color: #6b7280; margin-top: 32px;">No workouts logged yet</p>';
+                list.innerHTML = '<div class="empty-state">No workouts logged yet.<br>Start tracking your progress!</div>';
             } else {
                 list.innerHTML = history.map(w => {
-                    let durationText = w.duration ? `<small>⏱️ ${w.duration} mins</small>` : '';
-                    let notesText = w.notes ? `<p style="font-style: italic; margin-top: 8px; color: #6b7280;">${w.notes}</p>` : '';
-                    return `<div class="card">
-                        <h3>${w.typeName}</h3>
-                        <p>${w.workoutName}</p>
-                        <small>📅 ${new Date(w.date).toLocaleDateString()}</small>
-                        ${durationText}
-                        ${notesText}
+                    let metaItems = [];
+                    metaItems.push(`📅 ${new Date(w.date).toLocaleDateString()}`);
+                    if (w.duration) metaItems.push(`⏱️ ${w.duration} mins`);
+                    if (w.equipment) metaItems.push(`🏋️ ${w.equipment}`);
+                    
+                    let notesHtml = '';
+                    if (w.notes) notesHtml = `<div class="notes">${w.notes}</div>`;
+                    
+                    return `<div class="history-card">
+                        <h4>${w.workoutName}</h4>
+                        ${w.workoutInfo ? `<p style="font-size: 13px; color: #6b7280; margin-bottom: 6px;">${w.workoutInfo}</p>` : ''}
+                        <div class="meta">${metaItems.join(' • ')}</div>
+                        ${notesHtml}
                     </div>`;
                 }).join('');
             }
