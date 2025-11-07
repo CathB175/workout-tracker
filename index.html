@@ -18,7 +18,7 @@
         .weekly-summary .small { font-size: 14px; opacity: 0.9; }
         .goal-badge { position: absolute; top: 12px; right: 12px; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
         .goal-badge.complete { background: #10b981; color: white; }
-        .goal-badge.partial { background: #f59e0b; color: white; }
+        .goal-badge.partial { background: #14b8a6; color: white; }
         .goal-badge.pending { background: #e5e7eb; color: #6b7280; }
         .card { background: white; padding: 16px; border-radius: 8px; border: 2px solid #f3f4f6; margin-bottom: 12px; cursor: pointer; position: relative; }
         .card:active { background: #f9fafb; }
@@ -260,8 +260,9 @@
             let total = 0;
             types.forEach(type => {
                 const thisWeek = getThisWeeksWorkouts(type.id).length;
-                total++;
-                if (thisWeek >= type.weeklyGoal) completed++;
+                const goal = type.weeklyGoal;
+                total += goal;
+                completed += Math.min(thisWeek, goal);
             });
             return { completed, total };
         }
@@ -306,7 +307,7 @@
             
             let summaryHtml = `<div class="weekly-summary">
                 <div class="big">${progress.completed} of ${progress.total}</div>
-                <div class="small">Weekly goals completed</div>
+                <div class="small">Weekly workouts completed</div>
             </div>`;
             
             list.innerHTML = summaryHtml + types.map(type => {
