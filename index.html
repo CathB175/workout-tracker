@@ -278,7 +278,6 @@
                 if (next) nextText = `<small style="color: #14b8a6;">Next: Cycle ${next.cycle} Session ${next.session}</small>`;
                 return `<div class="card" onclick="selectType('${type.id}')">
                     <h3>${type.name}</h3>
-                    <p>${type.description}</p>
                     ${lastText}${nextText}
                 </div>`;
             }).join('');
@@ -298,12 +297,16 @@
             currentView = 'cycles';
             document.getElementById('cyclesView').classList.remove('hidden');
             document.getElementById('backBtn').classList.remove('hidden');
-            const next = getNext(selectedType.id);
             document.getElementById('cyclesTitle').textContent = selectedType.name;
-            document.getElementById('cyclesSubtitle').textContent = `Next up: Cycle ${next.cycle} Session ${next.session}`;
+            document.getElementById('cyclesSubtitle').textContent = selectedType.description;
+            
+            const next = getNext(selectedType.id);
             
             const list = document.getElementById('cyclesList');
-            list.innerHTML = data.hiit.cycles.map(cycle => {
+            list.innerHTML = `<div style="margin-bottom: 20px; padding: 12px; background: #f0fdfa; border-radius: 8px; border-left: 4px solid #14b8a6;">
+                <div style="font-size: 14px; font-weight: 600; color: #0f766e; margin-bottom: 4px;">Next up:</div>
+                <div style="font-size: 13px; color: #134e4a;">Cycle ${next.cycle} Session ${next.session}</div>
+            </div>` + data.hiit.cycles.map(cycle => {
                 const last = getLast(selectedType.id, cycle.id);
                 let lastText = '';
                 if (last) lastText = `<small>Last: Session ${last.session} - ${new Date(last.date).toLocaleDateString()}</small>`;
