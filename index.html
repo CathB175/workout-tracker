@@ -141,7 +141,7 @@
                         id: 1, 
                         name: 'Cycle 1', 
                         workouts: [
-                            { session: 1, name: 'Cycle 1 - Workout 1', info: 'HIIT 5 moves x 5 rounds 30s work 30s rest', duration: 25, equipment: '', notes: 'Good - all standing' },
+                            { session: 1, name: 'Cycle 1 - Workout 1', info: 'HIIT 5 moves x 5 rounds 30s work 30s rest', duration: 25, equipment: '', notes: '' },
                             { session: 2, name: 'Cycle 1 - Workout 2', info: 'HIIT 5 moves x 5 rounds 30s work 30s rest', duration: 25, equipment: '', notes: '' },
                             { session: 3, name: 'Cycle 1 - Workout 3', info: 'HIIT 6 moves x 4 rounds 30s work 30s rest', duration: 25, equipment: '', notes: '' },
                             { session: 4, name: 'Cycle 1 - Workout 4', info: 'HIIT 8 moves x 3 rounds 30s work 30s rest', duration: 25, equipment: '', notes: '' },
@@ -394,6 +394,30 @@
             let detailsHtml = `<strong>${selectedWorkout.name || 'Session ' + selectedWorkout.session}</strong>`;
             if (selectedWorkout.info) detailsHtml += `<div style="margin-top: 4px;">${selectedWorkout.info}</div>`;
             if (selectedWorkout.notes) detailsHtml += `<div style="margin-top: 4px; color: #059669;">💡 ${selectedWorkout.notes}</div>`;
+            
+            // Show previous workout history
+            const previousLogs = history.filter(h => {
+                if (selectedWorkout.session) {
+                    return h.type === selectedType.id && h.cycle === selectedCycle && h.session === selectedWorkout.session;
+                } else {
+                    return h.workoutId === selectedWorkout.id;
+                }
+            }).slice(0, 3);
+            
+            if (previousLogs.length > 0) {
+                detailsHtml += `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">`;
+                detailsHtml += `<div style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 8px;">Previous times:</div>`;
+                previousLogs.forEach(log => {
+                    detailsHtml += `<div style="font-size: 12px; color: #374151; margin-bottom: 6px; padding: 6px; background: #f9fafb; border-radius: 4px;">`;
+                    detailsHtml += `<div style="font-weight: 500;">${new Date(log.date).toLocaleDateString()}`;
+                    if (log.duration) detailsHtml += ` • ${log.duration} mins`;
+                    detailsHtml += `</div>`;
+                    if (log.equipment) detailsHtml += `<div style="color: #6b7280; margin-top: 2px;">Equipment: ${log.equipment}</div>`;
+                    if (log.notes) detailsHtml += `<div style="color: #6b7280; margin-top: 2px; font-style: italic;">${log.notes}</div>`;
+                    detailsHtml += `</div>`;
+                });
+                detailsHtml += `</div>`;
+            }
             
             document.getElementById('workoutDetails').innerHTML = detailsHtml;
             document.getElementById('logModal').classList.add('show');
