@@ -13,8 +13,17 @@
         .container { padding: 24px 24px 100px 24px; }
         .title { font-size: 28px; font-weight: bold; margin-bottom: 8px; }
         .subtitle { color: #6b7280; margin-bottom: 32px; font-size: 14px; }
-        .card { background: white; padding: 16px; border-radius: 8px; border: 2px solid #f3f4f6; margin-bottom: 12px; cursor: pointer; }
+        .weekly-summary { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: white; padding: 16px; border-radius: 12px; margin-bottom: 24px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .weekly-summary .big { font-size: 32px; font-weight: bold; margin-bottom: 4px; }
+        .weekly-summary .small { font-size: 14px; opacity: 0.9; }
+        .goal-badge { position: absolute; top: 12px; right: 12px; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
+        .goal-badge.complete { background: #10b981; color: white; }
+        .goal-badge.partial { background: #f59e0b; color: white; }
+        .goal-badge.pending { background: #e5e7eb; color: #6b7280; }
+        .card { background: white; padding: 16px; border-radius: 8px; border: 2px solid #f3f4f6; margin-bottom: 12px; cursor: pointer; position: relative; }
         .card:active { background: #f9fafb; }
+        .card.completed { background: #d1fae5; border-color: #10b981; }
+        .card.partial { background: #fef3c7; border-color: #f59e0b; }
         .card h3 { font-weight: 600; font-size: 18px; margin-bottom: 4px; }
         .card p { font-size: 14px; color: #6b7280; margin-bottom: 4px; }
         .card small { font-size: 12px; color: #9ca3af; display: block; margin-top: 4px; }
@@ -125,13 +134,13 @@
         let history = JSON.parse(localStorage.getItem('workoutHistory') || '[]');
 
         const types = [
-            { id: 'hiit', name: 'HIIT', description: 'High-Intensity Interval Training from The Body Coach', hasCycles: true },
-            { id: 'strength', name: 'Strength in Menopause', description: 'Building strength and stability with The Body Coach' },
-            { id: 'barre', name: 'Barre', description: 'Define strength and lengthen with The Body Coach' },
-            { id: 'yoga-pilates', name: 'Yoga & Pilates', description: 'Flow and strengthen with The Body Coach' },
-            { id: 'smm', name: 'SMM', description: 'Simple Mobility Method for daily movements' },
-            { id: 'stability', name: 'Stability Builder', description: 'Build a solid core foundation and improve balance' },
-            { id: 'spf', name: 'SPF', description: 'Keeping your shoulders neck and upper back happy' }
+            { id: 'hiit', name: 'HIIT', description: 'High-Intensity Interval Training from The Body Coach', hasCycles: true, weeklyGoal: 1 },
+            { id: 'strength', name: 'Strength in Menopause', description: 'Building strength and stability with The Body Coach', weeklyGoal: 1 },
+            { id: 'barre', name: 'Barre', description: 'Define strength and lengthen with The Body Coach', weeklyGoal: 1 },
+            { id: 'yoga-pilates', name: 'Yoga & Pilates', description: 'Flow and strengthen with The Body Coach', weeklyGoal: 1 },
+            { id: 'smm', name: 'SMM', description: 'Simple Mobility Method for daily movements', weeklyGoal: 1 },
+            { id: 'stability', name: 'Stability Builder', description: 'Build a solid core foundation and improve balance', weeklyGoal: 1 },
+            { id: 'spf', name: 'SPF', description: 'Keeping your shoulders neck and upper back happy', weeklyGoal: 4 }
         ];
 
         const data = {
@@ -229,6 +238,34 @@
             ]
         };
 
+        function getWeekStart() {
+            const now = new Date();
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(now.setDate(diff));
+            monday.setHours(0, 0, 0, 0);
+            return monday;
+        }
+
+        function getThisWeeksWorkouts(typeId) {
+            const weekStart = getWeekStart();
+            return history.filter(h => {
+                const workoutDate = new Date(h.date);
+                return h.type === typeId && workoutDate >= weekStart;
+            });
+        }
+
+        function getWeeklyProgress() {
+            let completed = 0;
+            let total = 0;
+            types.forEach(type => {
+                const thisWeek = getThisWeeksWorkouts(type.id).length;
+                total++;
+                if (thisWeek >= type.weeklyGoal) completed++;
+            });
+            return { completed, total };
+        }
+
         function getLast(type, cycle = null, session = null) {
             return history.filter(h => {
                 if (h.type !== type) return false;
@@ -264,10 +301,34 @@
         }
 
         function renderTypes() {
+            const progress = getWeeklyProgress();
             const list = document.getElementById('typesList');
-            list.innerHTML = types.map(type => {
+            
+            let summaryHtml = `<div class="weekly-summary">
+                <div class="big">${progress.completed} of ${progress.total}</div>
+                <div class="small">Weekly goals completed</div>
+            </div>`;
+            
+            list.innerHTML = summaryHtml + types.map(type => {
                 const last = getLast(type.id);
+                const thisWeek = getThisWeeksWorkouts(type.id).length;
+                const goal = type.weeklyGoal;
                 const next = type.id === 'hiit' ? getNext(type.id) : null;
+                
+                let cardClass = 'card';
+                let badgeClass = 'goal-badge pending';
+                let badgeText = `0/${goal}`;
+                
+                if (thisWeek >= goal) {
+                    cardClass = 'card completed';
+                    badgeClass = 'goal-badge complete';
+                    badgeText = '✓ Done';
+                } else if (thisWeek > 0) {
+                    cardClass = 'card partial';
+                    badgeClass = 'goal-badge partial';
+                    badgeText = `${thisWeek}/${goal}`;
+                }
+                
                 let lastText = '';
                 if (last) {
                     lastText = `<small>Last: ${new Date(last.date).toLocaleDateString()}`;
@@ -276,7 +337,9 @@
                 }
                 let nextText = '';
                 if (next) nextText = `<small style="color: #14b8a6;">Next: Cycle ${next.cycle} Session ${next.session}</small>`;
-                return `<div class="card" onclick="selectType('${type.id}')">
+                
+                return `<div class="${cardClass}" onclick="selectType('${type.id}')">
+                    <div class="${badgeClass}">${badgeText}</div>
                     <h3>${type.name}</h3>
                     ${lastText}${nextText}
                 </div>`;
