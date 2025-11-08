@@ -16,7 +16,7 @@
         .weekly-summary { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: white; padding: 16px; border-radius: 12px; margin-bottom: 24px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .weekly-summary .big { font-size: 32px; font-weight: bold; margin-bottom: 4px; }
         .weekly-summary .small { font-size: 14px; opacity: 0.9; }
-        .goal-badge { position: absolute; top: 12px; right: 12px; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
+        .goal-badge { position: absolute; top: 12px; right: 44px; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
         .goal-badge.complete { background: #10b981; color: white; }
         .goal-badge.partial { background: #14b8a6; color: white; }
         .goal-badge.pending { background: #e5e7eb; color: #6b7280; }
@@ -53,7 +53,7 @@
         .badge { display: inline-block; background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-top: 4px; }
         .workout-group { border: 2px solid #14b8a6; border-radius: 8px; padding: 12px; margin-bottom: 16px; background: #f0fdfa; }
         .workout-group-title { font-size: 13px; font-weight: 600; color: #0f766e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .favorite-star { position: absolute; top: 12px; right: 42px; font-size: 20px; cursor: pointer; }
+        .favorite-star { position: absolute; top: 12px; right: 12px; font-size: 20px; cursor: pointer; z-index: 10; }
         .favorite-star.active { color: #f59e0b; }
         .favorite-star.inactive { color: #d1d5db; }
     </style>
@@ -214,7 +214,15 @@
                 { id: 'pilates_3', name: 'Healthy Spine', info: 'Pilates 3 health spine', duration: 30, equipment: '', notes: '' },
                 { id: 'pilates_4', name: 'Flexibility', info: 'Pilates 4 flexibility', duration: 25, equipment: '', notes: '' },
                 { id: 'pilates_5', name: 'Standing', info: 'Pilates 5 standing', duration: 20, equipment: '', notes: '' },
-                { id: 'pilates_6', name: 'Total Body Flow', info: 'Pilates 6 Total body flow', duration: 30, equipment: '', notes: '' }
+                { id: 'pilates_6', name: 'Total Body Flow', info: 'Pilates 6 Total body flow', duration: 30, equipment: '', notes: '' },
+                { id: 'sunday_stretch_1', name: 'Sunday Stretch 7/3', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
+                { id: 'sunday_stretch_2', name: 'Sunday Stretch 14/3', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
+                { id: 'sunday_stretch_3', name: 'Sunday Stretch 21/3', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
+                { id: 'sunday_stretch_4', name: 'Sunday Stretch 28/3', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
+                { id: 'sunday_stretch_5', name: 'Sunday Stretch 4/4', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
+                { id: 'sunday_stretch_6', name: 'Sunday Stretch 11/4', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
+                { id: 'sunday_stretch_7', name: 'Sunday Stretch 18/4', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
+                { id: 'sunday_stretch_8', name: 'Sunday Stretch 25/4', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' }
             ],
             smm: [
                 { id: 'smm_1', name: 'SMM Run through', info: 'Essential daily movements from SMM', duration: 30, equipment: '', notes: '' },
@@ -466,6 +474,19 @@
                     
                     html += '<div class="workout-group"><div class="workout-group-title">Strength Series</div>';
                     html += strengthWorkouts.map(w => renderWorkoutCard(w)).join('');
+                    html += '</div>';
+                    
+                    list.innerHTML = html;
+                } else if (selectedType.id === 'yoga-pilates') {
+                    const pilatesWorkouts = workouts.filter(w => w.id.startsWith('pilates_'));
+                    const sundayWorkouts = workouts.filter(w => w.id.startsWith('sunday_'));
+                    
+                    html += '<div class="workout-group"><div class="workout-group-title">Pilates</div>';
+                    html += pilatesWorkouts.map(w => renderWorkoutCard(w)).join('');
+                    html += '</div>';
+                    
+                    html += '<div class="workout-group"><div class="workout-group-title">Sunday Stretch</div>';
+                    html += sundayWorkouts.map(w => renderWorkoutCard(w)).join('');
                     html += '</div>';
                     
                     list.innerHTML = html;
