@@ -51,6 +51,11 @@
         .history-card .meta { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
         .history-card .notes { font-size: 14px; color: #374151; font-style: italic; background: #f9fafb; padding: 8px; border-radius: 6px; margin-top: 8px; }
         .badge { display: inline-block; background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-top: 4px; }
+        .workout-group { border: 2px solid #14b8a6; border-radius: 8px; padding: 12px; margin-bottom: 16px; background: #f0fdfa; }
+        .workout-group-title { font-size: 13px; font-weight: 600; color: #0f766e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .favorite-star { position: absolute; top: 12px; right: 42px; font-size: 20px; cursor: pointer; }
+        .favorite-star.active { color: #f59e0b; }
+        .favorite-star.inactive { color: #d1d5db; }
     </style>
 </head>
 <body>
@@ -97,10 +102,6 @@
                 <input type="date" id="logDate">
             </div>
             <div class="form-group">
-                <label>Duration (minutes)</label>
-                <input type="number" id="logDuration" placeholder="25">
-            </div>
-            <div class="form-group">
                 <label>Equipment Used</label>
                 <input type="text" id="logEquipment" placeholder="Dumbbells, resistance band, etc.">
             </div>
@@ -132,6 +133,7 @@
         let selectedCycle = null;
         let selectedWorkout = null;
         let history = JSON.parse(localStorage.getItem('workoutHistory') || '[]');
+        let favorites = JSON.parse(localStorage.getItem('workoutFavorites') || '[]');
 
         const types = [
             { id: 'hiit', name: 'HIIT', description: 'High-Intensity Interval Training from The Body Coach', hasCycles: true, weeklyGoal: 1 },
@@ -237,6 +239,23 @@
                 { id: 'smm_spf_3', name: 'Muscle Activation Circuit', info: 'Muscle activation circuit', duration: 10, equipment: '', notes: '' }
             ]
         };
+
+        function toggleFavorite(workoutId, event) {
+            event.stopPropagation();
+            const index = favorites.indexOf(workoutId);
+            if (index > -1) {
+                favorites.splice(index, 1);
+            } else {
+                favorites.push(workoutId);
+            }
+            localStorage.setItem('workoutFavorites', JSON.stringify(favorites));
+            if (currentView === 'workouts') showWorkouts();
+            else if (currentView === 'sessions') showSessions();
+        }
+
+        function isFavorite(workoutId) {
+            return favorites.includes(workoutId);
+        }
 
         function getWeekStart() {
             const now = new Date();
@@ -397,14 +416,16 @@
             const list = document.getElementById('sessionsList');
             const cycle = data.hiit.cycles.find(c => c.id === selectedCycle);
             list.innerHTML = cycle.workouts.map(workout => {
+                const workoutId = `hiit-${selectedCycle}-${workout.session}`;
                 const last = getLast(selectedType.id, selectedCycle, workout.session);
+                const favStar = isFavorite(workoutId) ? 'active' : 'inactive';
                 let lastText = '';
                 if (last) {
-                    lastText = `<small>Last: ${new Date(last.date).toLocaleDateString()}`;
-                    if (last.duration) lastText += ` - ${last.duration} mins`;
-                    lastText += '</small>';
+                    lastText = `<small>Last: ${new Date(last.date).toLocaleDateString()}</small>`;
                 }
                 return `<div class="card" onclick='selectSessionWorkout(${JSON.stringify(workout)})'>
+                    <span class="favorite-star ${favStar}" onclick='toggleFavorite("${workoutId}", event)'>★</span>
+                    <div class="goal-badge pending">${workout.duration}m</div>
                     <h3>Session ${workout.session}</h3>
                     <p>${workout.info}</p>
                     ${workout.equipment ? `<div class="equipment">Equipment: ${workout.equipment}</div>` : ''}
@@ -433,18 +454,40 @@
             if (!workouts || workouts.length === 0) {
                 list.innerHTML = '<div class="empty-state">No workouts added yet.<br>Add your workouts here when ready!</div>';
             } else {
-                list.innerHTML = workouts.map(workout => {
-                    const last = history.find(h => h.workoutId === workout.id);
-                    let lastText = '';
-                    if (last) lastText = `<small>Last: ${new Date(last.date).toLocaleDateString()}</small>`;
-                    return `<div class="card" onclick='selectWorkout(${JSON.stringify(workout)})'>
-                        <h3>${workout.name}</h3>
-                        <p>${workout.info} • ${workout.duration} mins</p>
-                        ${workout.equipment ? `<div class="equipment">Equipment: ${workout.equipment}</div>` : ''}
-                        ${lastText}
-                    </div>`;
-                }).join('');
+                // Group strength workouts
+                let html = '';
+                if (selectedType.id === 'strength') {
+                    const bodyWorkouts = workouts.filter(w => w.id.startsWith('menopause_'));
+                    const strengthWorkouts = workouts.filter(w => w.id.startsWith('strength_'));
+                    
+                    html += '<div class="workout-group"><div class="workout-group-title">Body Focus Series</div>';
+                    html += bodyWorkouts.map(w => renderWorkoutCard(w)).join('');
+                    html += '</div>';
+                    
+                    html += '<div class="workout-group"><div class="workout-group-title">Strength Series</div>';
+                    html += strengthWorkouts.map(w => renderWorkoutCard(w)).join('');
+                    html += '</div>';
+                    
+                    list.innerHTML = html;
+                } else {
+                    list.innerHTML = workouts.map(w => renderWorkoutCard(w)).join('');
+                }
             }
+        }
+
+        function renderWorkoutCard(workout) {
+            const last = history.find(h => h.workoutId === workout.id);
+            const favStar = isFavorite(workout.id) ? 'active' : 'inactive';
+            let lastText = '';
+            if (last) lastText = `<small>Last: ${new Date(last.date).toLocaleDateString()}</small>`;
+            return `<div class="card" onclick='selectWorkout(${JSON.stringify(workout)})'>
+                <span class="favorite-star ${favStar}" onclick='toggleFavorite("${workout.id}", event)'>★</span>
+                <div class="goal-badge pending">${workout.duration}m</div>
+                <h3>${workout.name}</h3>
+                <p>${workout.info}</p>
+                ${workout.equipment ? `<div class="equipment">Equipment: ${workout.equipment}</div>` : ''}
+                ${lastText}
+            </div>`;
         }
 
         function selectWorkout(workout) {
@@ -454,7 +497,6 @@
 
         function openModal() {
             document.getElementById('logDate').value = new Date().toISOString().split('T')[0];
-            document.getElementById('logDuration').value = selectedWorkout.duration || '';
             document.getElementById('logEquipment').value = selectedWorkout.equipment || '';
             document.getElementById('logNotes').value = '';
             
@@ -476,9 +518,7 @@
                 detailsHtml += `<div style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 8px;">Previous times:</div>`;
                 previousLogs.forEach(log => {
                     detailsHtml += `<div style="font-size: 12px; color: #374151; margin-bottom: 6px; padding: 6px; background: #f9fafb; border-radius: 4px;">`;
-                    detailsHtml += `<div style="font-weight: 500;">${new Date(log.date).toLocaleDateString()}`;
-                    if (log.duration) detailsHtml += ` • ${log.duration} mins`;
-                    detailsHtml += `</div>`;
+                    detailsHtml += `<div style="font-weight: 500;">${new Date(log.date).toLocaleDateString()}</div>`;
                     if (log.equipment) detailsHtml += `<div style="color: #6b7280; margin-top: 2px;">Equipment: ${log.equipment}</div>`;
                     if (log.notes) detailsHtml += `<div style="color: #6b7280; margin-top: 2px; font-style: italic;">${log.notes}</div>`;
                     detailsHtml += `</div>`;
@@ -505,7 +545,7 @@
                 workoutName: selectedWorkout?.name || `Cycle ${selectedCycle} Session ${selectedWorkout?.session}`,
                 workoutInfo: selectedWorkout?.info || '',
                 date: document.getElementById('logDate').value,
-                duration: document.getElementById('logDuration').value,
+                duration: selectedWorkout?.duration || '',
                 equipment: document.getElementById('logEquipment').value,
                 notes: document.getElementById('logNotes').value
             };
