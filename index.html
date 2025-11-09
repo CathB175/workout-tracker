@@ -16,6 +16,13 @@
         .weekly-summary { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: white; padding: 16px; border-radius: 12px; margin-bottom: 24px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .weekly-summary .big { font-size: 32px; font-weight: bold; margin-bottom: 4px; }
         .weekly-summary .small { font-size: 14px; opacity: 0.9; }
+        .affirmation-card { background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 2px solid #14b8a6; position: relative; }
+        .affirmation-text { font-size: 16px; line-height: 1.6; color: #0f766e; font-style: italic; text-align: center; margin-bottom: 12px; font-weight: 500; }
+        .affirmation-actions { display: flex; justify-content: center; gap: 16px; align-items: center; }
+        .affirmation-btn { background: none; border: none; font-size: 24px; cursor: pointer; padding: 8px; }
+        .affirmation-heart { color: #d1d5db; }
+        .affirmation-heart.active { color: #f43f5e; }
+        .affirmation-next { color: #14b8a6; font-size: 14px; font-weight: 600; }
         .goal-badge { position: absolute; top: 12px; right: 44px; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
         .goal-badge.complete { background: #10b981; color: white; }
         .goal-badge.partial { background: #14b8a6; color: white; }
@@ -134,6 +141,36 @@
         let selectedWorkout = null;
         let history = JSON.parse(localStorage.getItem('workoutHistory') || '[]');
         let favorites = JSON.parse(localStorage.getItem('workoutFavorites') || '[]');
+        let favoriteAffirmations = JSON.parse(localStorage.getItem('favoriteAffirmations') || '[]');
+        let dailyAffirmationIndex = 0;
+
+        const affirmations = [
+            "You are stronger than you think, both in body and mind.",
+            "Every movement is progress, no matter how small.",
+            "Your body is capable of amazing things today.",
+            "Rest is part of the journey, not a pause from it.",
+            "You are worthy of the time you invest in yourself.",
+            "This phase of life brings wisdom and strength.",
+            "Listen to your body - it knows what it needs.",
+            "Your consistency matters more than perfection.",
+            "You are creating a life of vitality and joy.",
+            "Breathe deeply. You are exactly where you need to be.",
+            "Your strength grows from showing up, again and again.",
+            "You are evolving beautifully through every season of life.",
+            "Movement is a celebration of what your body can do.",
+            "Today, you choose to honor your wellbeing.",
+            "You deserve the same kindness you give to others.",
+            "Your body is your home - treat it with love.",
+            "Small steps still move you forward.",
+            "You are enough, exactly as you are right now.",
+            "This moment is an opportunity for growth.",
+            "Your journey is uniquely yours - honor it.",
+            "Strength isn't just physical, it's showing up with courage.",
+            "You are building habits that will serve you for life.",
+            "Every breath is a chance to begin again.",
+            "Your resilience is remarkable.",
+            "You are worthy of rest, recovery, and renewal."
+        ];
 
         const types = [
             { id: 'hiit', name: 'HIIT', description: 'High-Intensity Interval Training from The Body Coach', hasCycles: true, weeklyGoal: 1 },
@@ -248,6 +285,47 @@
             ]
         };
 
+        function getDailyAffirmation() {
+            const today = new Date().toDateString();
+            const saved = localStorage.getItem('dailyAffirmationDate');
+            
+            if (saved !== today) {
+                // New day, pick a random affirmation
+                dailyAffirmationIndex = Math.floor(Math.random() * affirmations.length);
+                localStorage.setItem('dailyAffirmationDate', today);
+                localStorage.setItem('dailyAffirmationIndex', dailyAffirmationIndex);
+            } else {
+                // Same day, use saved index
+                dailyAffirmationIndex = parseInt(localStorage.getItem('dailyAffirmationIndex') || '0');
+            }
+            
+            return affirmations[dailyAffirmationIndex];
+        }
+
+        function nextAffirmation() {
+            dailyAffirmationIndex = (dailyAffirmationIndex + 1) % affirmations.length;
+            localStorage.setItem('dailyAffirmationIndex', dailyAffirmationIndex);
+            renderTypes();
+        }
+
+        function toggleAffirmationFavorite() {
+            const affirmation = affirmations[dailyAffirmationIndex];
+            const index = favoriteAffirmations.indexOf(affirmation);
+            
+            if (index > -1) {
+                favoriteAffirmations.splice(index, 1);
+            } else {
+                favoriteAffirmations.push(affirmation);
+            }
+            
+            localStorage.setItem('favoriteAffirmations', JSON.stringify(favoriteAffirmations));
+            renderTypes();
+        }
+
+        function isAffirmationFavorite() {
+            return favoriteAffirmations.includes(affirmations[dailyAffirmationIndex]);
+        }
+
         function toggleFavorite(workoutId, event) {
             event.stopPropagation();
             const index = favorites.indexOf(workoutId);
@@ -330,14 +408,28 @@
 
         function renderTypes() {
             const progress = getWeeklyProgress();
+            const affirmation = getDailyAffirmation();
+            const isFav = isAffirmationFavorite();
             const list = document.getElementById('typesList');
+            
+            let affirmationHtml = `<div class="affirmation-card">
+                <div class="affirmation-text">"${affirmation}"</div>
+                <div class="affirmation-actions">
+                    <button class="affirmation-btn affirmation-heart ${isFav ? 'active' : ''}" onclick="toggleAffirmationFavorite()">
+                        ${isFav ? '❤️' : '🤍'}
+                    </button>
+                    <button class="affirmation-btn affirmation-next" onclick="nextAffirmation()">
+                        See another →
+                    </button>
+                </div>
+            </div>`;
             
             let summaryHtml = `<div class="weekly-summary">
                 <div class="big">${progress.completed} of ${progress.total}</div>
                 <div class="small">Weekly workouts completed</div>
             </div>`;
             
-            list.innerHTML = summaryHtml + types.map(type => {
+            list.innerHTML = affirmationHtml + summaryHtml + types.map(type => {
                 const last = getLast(type.id);
                 const thisWeek = getThisWeeksWorkouts(type.id).length;
                 const goal = type.weeklyGoal;
