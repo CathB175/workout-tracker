@@ -24,16 +24,16 @@
         .affirmation-heart.active { color: #f43f5e; }
         .affirmation-next { color: #14b8a6; font-size: 14px; font-weight: 600; }
         .goal-badge { position: absolute; top: 12px; right: 44px; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
-        .goal-badge.complete { background: #10b981; color: white; }
+        .goal-badge.complete { background: #14b8a6; color: white; }
         .goal-badge.partial { background: #14b8a6; color: white; }
         .goal-badge.pending { background: #e5e7eb; color: #6b7280; }
         .card { background: white; padding: 16px; border-radius: 8px; border: 2px solid #f3f4f6; margin-bottom: 12px; cursor: pointer; position: relative; }
         .card:active { background: #f9fafb; }
-        .card.completed { background: #d1fae5; border-color: #10b981; }
+        .card.completed { background: #ccfbf1; border-color: #14b8a6; }
         .card.partial { background: #ccfbf1; border-color: #14b8a6; }
         .card h3 { font-weight: 600; font-size: 18px; margin-bottom: 4px; }
         .card p { font-size: 14px; color: #6b7280; margin-bottom: 4px; }
-        .card small { font-size: 12px; color: #9ca3af; display: block; margin-top: 4px; }
+        .card small { font-size: 12px; color: #6b7280; display: block; margin-top: 4px; }
         .card .equipment { font-size: 13px; color: #14b8a6; margin-top: 6px; font-weight: 500; }
         .empty-state { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 15px; }
         .nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e5e7eb; display: flex; }
@@ -139,10 +139,24 @@
         let selectedType = null;
         let selectedCycle = null;
         let selectedWorkout = null;
-        let history = JSON.parse(localStorage.getItem('workoutHistory') || '[]');
+        let history = [];
         let favorites = JSON.parse(localStorage.getItem('workoutFavorites') || '[]');
         let favoriteAffirmations = JSON.parse(localStorage.getItem('favoriteAffirmations') || '[]');
         let dailyAffirmationIndex = 0;
+
+        // Load and clean history on startup
+        (function initHistory() {
+            const saved = localStorage.getItem('workoutHistory');
+            if (saved) {
+                const allHistory = JSON.parse(saved);
+                const threeMonthsAgo = new Date();
+                threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                history = allHistory.filter(h => new Date(h.date) >= threeMonthsAgo);
+                if (history.length !== allHistory.length) {
+                    localStorage.setItem('workoutHistory', JSON.stringify(history));
+                }
+            }
+        })();
 
         const affirmations = [
             "You are stronger than you think, both in body and mind.",
@@ -259,7 +273,8 @@
                 { id: 'sunday_stretch_5', name: 'Sunday Stretch 4/4', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
                 { id: 'sunday_stretch_6', name: 'Sunday Stretch 11/4', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
                 { id: 'sunday_stretch_7', name: 'Sunday Stretch 18/4', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
-                { id: 'sunday_stretch_8', name: 'Sunday Stretch 25/4', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' }
+                { id: 'sunday_stretch_8', name: 'Sunday Stretch 25/4', info: 'Sunday stretch with Joe', duration: 30, equipment: '', notes: '' },
+                { id: 'yoga_1', name: 'Other Yoga', info: 'Other yoga sessions', duration: 30, equipment: '', notes: '' }
             ],
             smm: [
                 { id: 'smm_1', name: 'SMM Run through', info: 'Essential daily movements from SMM', duration: 30, equipment: '', notes: '' },
@@ -276,7 +291,7 @@
                 { id: 'smm_stability_6', name: 'Attached Resistance Band', info: 'Full body and core activation', duration: 27, equipment: 'Resistance band', notes: '' },
                 { id: 'smm_stability_7', name: 'Unilateral Stability', info: 'Assessing your workout where do you struggle the most', duration: 22, equipment: 'Weights', notes: 'Cool down finisher' },
                 { id: 'smm_stability_8', name: 'Super Duper Sets', info: 'Combining multiple complimentary exercises to increase the workload', duration: 36, equipment: 'Weights', notes: '' },
-                { id: 'smm_stability_9', name: 'Lower Back & Core Builder', info: 'Addressing hips core and balance this can be done even during a flareup', duration: 30, equipment: 'Resistance band', notes: '' }
+                { id: 'smm_stability_9', name: 'Lower Back & Core Builder', info: 'Addressing hips core and balance this can be done even during a flareup. No need to warm up first. Resistance band needs attaching so garage used at the end of the workout', duration: 30, equipment: 'Resistance band', notes: '' }
             ],
             spf: [
                 { id: 'smm_spf_1', name: 'Daily Circuit 1', info: 'Foundation circuit use as a warm up or posture pick me up', duration: 10, equipment: '', notes: '' },
@@ -572,6 +587,7 @@
                 } else if (selectedType.id === 'yoga-pilates') {
                     const pilatesWorkouts = workouts.filter(w => w.id.startsWith('pilates_'));
                     const sundayWorkouts = workouts.filter(w => w.id.startsWith('sunday_'));
+                    const yogaWorkouts = workouts.filter(w => w.id.startsWith('yoga_'));
                     
                     html += '<div class="workout-group"><div class="workout-group-title">Pilates</div>';
                     html += pilatesWorkouts.map(w => renderWorkoutCard(w)).join('');
@@ -579,6 +595,10 @@
                     
                     html += '<div class="workout-group"><div class="workout-group-title">Sunday Stretch</div>';
                     html += sundayWorkouts.map(w => renderWorkoutCard(w)).join('');
+                    html += '</div>';
+                    
+                    html += '<div class="workout-group"><div class="workout-group-title">Yoga</div>';
+                    html += yogaWorkouts.map(w => renderWorkoutCard(w)).join('');
                     html += '</div>';
                     
                     list.innerHTML = html;
