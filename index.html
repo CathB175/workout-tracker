@@ -23,6 +23,14 @@
         .affirmation-heart { color: #d1d5db; }
         .affirmation-heart.active { color: #f43f5e; }
         .affirmation-next { color: #14b8a6; font-size: 14px; font-weight: 600; }
+        .weekly-thoughts-section { background: #f0fdfa; border: 2px solid #14b8a6; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+        .weekly-thoughts-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .weekly-thoughts-title { font-size: 18px; font-weight: 600; color: #0f766e; }
+        .add-thought-btn { background: #14b8a6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .thought-card { background: white; padding: 14px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #14b8a6; }
+        .thought-date { font-size: 12px; color: #6b7280; font-weight: 600; margin-bottom: 6px; }
+        .thought-text { font-size: 14px; color: #374151; line-height: 1.5; }
+        .thought-prompt { font-size: 14px; color: #6b7280; font-style: italic; line-height: 1.6; margin-bottom: 16px; text-align: center; }
         .goal-badge { position: absolute; top: 12px; right: 44px; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
         .goal-badge.complete { background: #14b8a6; color: white; }
         .goal-badge.partial { background: #14b8a6; color: white; }
@@ -100,6 +108,20 @@
         <div id="historyList"></div>
     </div>
 
+    <div class="modal" id="thoughtModal">
+        <div class="modal-content">
+            <h3>Weekly Reflection</h3>
+            <p class="thought-prompt">How did this week go? Celebrate what went well! If you didn't hit all 10 workouts, that's okay - life happens. What events took your time? Remember, balance is just as important as consistency. You're doing great by showing up.</p>
+            <div class="form-group">
+                <textarea id="thoughtText" rows="6" placeholder="Write your thoughts about this week..." style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; font-family: inherit;"></textarea>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-cancel" onclick="closeThoughtModal()">Cancel</button>
+                <button class="btn btn-save" onclick="saveThought()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="logModal">
         <div class="modal-content">
             <h3>Log Workout</h3>
@@ -142,6 +164,7 @@
         let history = [];
         let favorites = JSON.parse(localStorage.getItem('workoutFavorites') || '[]');
         let favoriteAffirmations = JSON.parse(localStorage.getItem('favoriteAffirmations') || '[]');
+        let weeklyThoughts = [];
         let dailyAffirmationIndex = 0;
 
         // Load and clean history on startup
@@ -154,6 +177,15 @@
                 history = allHistory.filter(h => new Date(h.date) >= threeMonthsAgo);
                 if (history.length !== allHistory.length) {
                     localStorage.setItem('workoutHistory', JSON.stringify(history));
+                }
+            }
+            
+            const savedThoughts = localStorage.getItem('weeklyThoughts');
+            if (savedThoughts) {
+                const allThoughts = JSON.parse(savedThoughts);
+                weeklyThoughts = allThoughts.slice(0, 6);
+                if (weeklyThoughts.length !== allThoughts.length) {
+                    localStorage.setItem('weeklyThoughts', JSON.stringify(weeklyThoughts));
                 }
             }
         })();
@@ -667,6 +699,35 @@
             document.getElementById('logModal').classList.remove('show');
         }
 
+        function openThoughtModal() {
+            document.getElementById('thoughtText').value = '';
+            document.getElementById('thoughtModal').classList.add('show');
+        }
+
+        function closeThoughtModal() {
+            document.getElementById('thoughtModal').classList.remove('show');
+        }
+
+        function saveThought() {
+            const text = document.getElementById('thoughtText').value.trim();
+            if (!text) return;
+            
+            const weekStart = getWeekStart();
+            const newThought = {
+                id: Date.now(),
+                date: weekStart.toISOString(),
+                weekStart: weekStart.toDateString(),
+                text: text
+            };
+            
+            weeklyThoughts.unshift(newThought);
+            weeklyThoughts = weeklyThoughts.slice(0, 6);
+            localStorage.setItem('weeklyThoughts', JSON.stringify(weeklyThoughts));
+            
+            closeThoughtModal();
+            showHistory();
+        }
+
         function saveWorkout() {
             const newLog = {
                 id: Date.now(),
@@ -696,10 +757,31 @@
             document.getElementById('historyNavBtn').classList.add('active');
             
             const list = document.getElementById('historyList');
-            if (history.length === 0) {
-                list.innerHTML = '<div class="empty-state">No workouts logged yet.<br>Start tracking your progress!</div>';
+            
+            let thoughtsHtml = `<div class="weekly-thoughts-section">
+                <div class="weekly-thoughts-header">
+                    <div class="weekly-thoughts-title">Weekly Reflections</div>
+                    <button class="add-thought-btn" onclick="openThoughtModal()">+ Add This Week</button>
+                </div>`;
+            
+            if (weeklyThoughts.length === 0) {
+                thoughtsHtml += `<p style="text-align: center; color: #6b7280; font-size: 14px; margin-top: 8px;">No weekly thoughts yet. Start reflecting on your progress!</p>`;
             } else {
-                list.innerHTML = history.map(w => {
+                weeklyThoughts.forEach(thought => {
+                    const weekDate = new Date(thought.date);
+                    thoughtsHtml += `<div class="thought-card">
+                        <div class="thought-date">Week of ${weekDate.toLocaleDateString()}</div>
+                        <div class="thought-text">${thought.text}</div>
+                    </div>`;
+                });
+            }
+            
+            thoughtsHtml += `</div>`;
+            
+            if (history.length === 0) {
+                list.innerHTML = thoughtsHtml + '<div class="empty-state">No workouts logged yet.<br>Start tracking your progress!</div>';
+            } else {
+                const workoutsHtml = history.map(w => {
                     let metaItems = [];
                     metaItems.push(`📅 ${new Date(w.date).toLocaleDateString()}`);
                     if (w.duration) metaItems.push(`⏱️ ${w.duration} mins`);
@@ -715,6 +797,8 @@
                         ${notesHtml}
                     </div>`;
                 }).join('');
+                
+                list.innerHTML = thoughtsHtml + workoutsHtml;
             }
         }
 
