@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f9fafb; }
+        .header { background: #14b8a6; color: white; padding: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 20px; text-align: center; }
+        .back-btn { background: none; border: none; color: white; font-size: 16px; cursor: pointer; float: left; padding: 2px 8px 2px 0; }
+        .container { padding: 24px 24px 100px 24px; }
+        .title { font-size: 28px; font-weight: bold; margin-bottom: 8px; }
+        .subtitle { color: #6b7280; margin-bottom: 32px; font-size: 14px; }
+        .weekly-summary { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); color: white; padding: 16px; border-radius: 12px; margin-bottom: 24px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .weekly-summary .big { font-size: 32px; font-weight: bold; margin-bottom: 4px; }
+        .weekly-summary .small { font-size: 14px; opacity: 0.9; }
+        .affirmation-card { background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 2px solid #14b8a6; position: relative; }
+        .affirmation-text { font-size: 16px; line-height: 1.6; color: #0f766e; font-style: italic; text-align: center; margin-bottom: 12px; font-weight: 500; }
+        .affirmation-actions { display: flex; justify-content: center; gap: 16px; align-items: center; }
+        .affirmation-btn { background: none; border: none; font-size: 24px; cursor: pointer; padding: 8px; }
+        .affirmation-heart { color: #d1d5db; }
+        .affirmation-heart.active { color: #f43f5e; }
+        .affirmation-next { color: #14b8a6; font-size: 14px; font-weight: 600; background: none; border: none; cursor: pointer; }
+        .weekly-thoughts-section { background: #f0fdfa; border: 2px solid #14b8a6; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+        .weekly-thoughts-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .weekly-thoughts-title { font-size: 18px; font-weight: 600; color: #0f766e; }
+        .add-thought-btn { background: #14b8a6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .thought-card { background: white; padding: 14px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #14b8a6; }
+        .thought-date { font-size: 12px; color: #6b7280; font-weight: 600; margin-bottom: 6px; }
+        .thought-text { font-size: 14px; color: #374151; line-height: 1.5; }
+        .thought-prompt { font-size: 14px; color: #6b7280; font-style: italic; line-height: 1.6; margin-bottom: 16px; text-align: center; }
+        .goal-badge { position: absolute; top: 12px; right: 44px; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; }
+        .goal-badge.complete { background: #14b8a6; color: white; }
+        .goal-badge.partial { background: #14b8a6; color: white; }
+        .goal-badge.pending { background: #e5e7eb; color: #6b7280; }
+        .card { background: white; padding: 16px; border-radius: 8px; border: 2px solid #f3f4f6; margin-bottom: 12px; cursor: pointer; position: relative; }
+        .card:active { background: #f9fafb; }
+        .card.completed { background: #ccfbf1; border-color: #14b8a6; }
+        .card.partial { background: #ccfbf1; border-color: #14b8a6; }
+        .card h3 { font-weight: 600; font-size: 18px; margin-bottom: 4px; padding-right: 60px; }
+        .card p { font-size: 14px; color: #6b7280; margin-bottom: 4px; }
+        .card small { font-size: 12px; color: #6b7280; display: block; margin-top: 4px; }
+        .card .equipment { font-size: 13px; color: #14b8a6; margin-top: 6px; font-weight: 500; }
+        .empty-state { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 15px; }
+        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e5e7eb; display: flex; z-index: 100; }
+        .nav button { flex: 1; padding: 16px; background: none; border: none; color: #9ca3af; font-size: 12px; cursor: pointer; }
+        .nav button.active { color: #14b8a6; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); padding: 20px; overflow-y: auto; z-index: 9999; }
+        .modal.show { display: block; }
+        .modal-content { background: white; margin: 20px auto; padding: 24px; border-radius: 12px; max-width: 400px; }
+        .modal h3 { font-size: 22px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eee; }
+        .workout-details { background: #f9fafb; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+        .workout-details strong { display: block; margin-bottom: 4px; color: #111; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; font-family: inherit; }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        .btn { flex: 1; padding: 14px; border: none; border-radius: 8px; font-weight: 600; font-size: 16px; cursor: pointer; }
+        .btn-cancel { background: #e5e7eb; color: #111; }
+        .btn-save { background: #14b8a6; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .hidden { display: none; }
+        .history-card { background: white; padding: 14px; border-radius: 8px; border: 2px solid #f3f4f6; margin-bottom: 10px; }
+        .history-card h4 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+        .history-card .meta { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+        .history-card .notes { font-size: 14px; color: #374151; font-style: italic; background: #f9fafb; padding: 8px; border-radius: 6px; margin-top: 8px; }
+        .badge { display: inline-block; background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-top: 4px; }
+        .workout-group { border: 2px solid #14b8a6; border-radius: 8px; padding: 12px; margin-bottom: 16px; background: #f0fdfa; }
+        .workout-group-title { font-size: 13px; font-weight: 600; color: #0f766e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .favorite-star { position: absolute; top: 12px; right: 12px; font-size: 20px; cursor: pointer; z-index: 10; background: none; border: none; padding: 2px; }
+        .favorite-star.active { color: #f59e0b; }
+        .favorite-star.inactive { color: #d1d5db; }
+        .loading { text-align: center; padding: 40px; color: #6b7280; font-size: 15px; }
+        .loading-spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #e5e7eb; border-top-color: #14b8a6; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Admin styles */
+        .admin-section { background: #fff7ed; border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .admin-title { font-size: 18px; font-weight: 700; color: #92400e; }
+        .admin-btn { background: #f59e0b; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .admin-btn.small { padding: 4px 10px; font-size: 12px; }
+        .admin-btn.danger { background: #ef4444; }
+        .admin-item { background: white; padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #fde68a; display: flex; justify-content: space-between; align-items: center; }
+        .admin-item-info { flex: 1; }
+        .admin-item-name { font-weight: 600; font-size: 14px; }
+        .admin-item-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+        .admin-item-actions { display: flex; gap: 6px; margin-left: 12px; }
+        .admin-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .admin-tab { padding: 6px 14px; border-radius: 6px; border: 2px solid #f59e0b; background: white; color: #92400e; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .admin-tab.active { background: #f59e0b; color: white; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="back-btn hidden" id="backBtn" onclick="goBack()">← Back</button>
+        <h1 id="headerTitle">Workout Tracker</h1>
+    </div>
+
+    <!-- Loading screen -->
+    <div class="container" id="loadingView">
+        <div class="loading">
+            <div class="loading-spinner"></div>
+            <div>Loading your workouts...</div>
+        </div>
+    </div>
+
+    <!-- Home view -->
+    <div class="container hidden" id="homeView">
+        <h1 class="title">What do you fancy doing?</h1>
+        <p class="subtitle">Choose your workout type</p>
+        <div id="typesList"></div>
+    </div>
+
+    <!-- Cycles view -->
+    <div class="container hidden" id="cyclesView">
+        <h2 class="title" id="cyclesTitle"></h2>
+        <p class="subtitle" id="cyclesSubtitle"></p>
+        <div id="cyclesList"></div>
+    </div>
+
+    <!-- Sessions view -->
+    <div class="container hidden" id="sessionsView">
+        <h2 class="title" id="sessionsTitle"></h2>
+        <p class="subtitle">Choose a session</p>
+        <div id="sessionsList"></div>
+    </div>
+
+    <!-- Workouts view -->
+    <div class="container hidden" id="workoutsView">
+        <h2 class="title" id="workoutsTitle"></h2>
+        <p class="subtitle" id="workoutsSubtitle"></p>
+        <div id="workoutsList"></div>
+    </div>
+
+    <!-- History view -->
+    <div class="container hidden" id="historyView">
+        <h2 class="title">Workout History</h2>
+        <div id="historyList"></div>
+    </div>
+
+    <!-- Admin view -->
+    <div class="container hidden" id="adminView">
+        <h2 class="title">⚙️ Admin</h2>
+        <p class="subtitle">Manage your workouts and categories</p>
+        <div id="adminContent"></div>
+    </div>
+
+    <!-- Weekly reflection modal -->
+    <div class="modal" id="thoughtModal">
+        <div class="modal-content">
+            <h3>Weekly Reflection</h3>
+            <p class="thought-prompt">How did this week go? Celebrate what went well! If you didn't hit all your workouts, that's okay — life happens. Remember, balance is just as important as consistency. You're doing great by showing up.</p>
+            <div class="form-group">
+                <textarea id="thoughtText" rows="6" placeholder="Write your thoughts about this week..."></textarea>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-cancel" onclick="closeThoughtModal()">Cancel</button>
+                <button class="btn btn-save" onclick="saveThought()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log workout modal -->
+    <div class="modal" id="logModal">
+        <div class="modal-content">
+            <h3>Log Workout</h3>
+            <div class="workout-details" id="workoutDetails"></div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="logDate">
+            </div>
+            <div class="form-group">
+                <label>Equipment Used</label>
+                <input type="text" id="logEquipment" placeholder="Dumbbells, resistance band, etc.">
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea id="logNotes" rows="3" placeholder="Weights used, how it felt, modifications..."></textarea>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-save" onclick="saveWorkout()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin: Add/Edit Category modal -->
+    <div class="modal" id="categoryModal">
+        <div class="modal-content">
+            <h3 id="categoryModalTitle">Add Category</h3>
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="catName" placeholder="e.g. Yoga & Pilates">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <input type="text" id="catDescription" placeholder="Short description">
+            </div>
+            <div class="form-group">
+                <label>Weekly Goal (workouts per week)</label>
+                <input type="number" id="catWeeklyGoal" value="1" min="1" max="14">
+            </div>
+            <div class="form-group">
+                <label>Has Cycles? (like HIIT)</label>
+                <select id="catHasCycles">
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                </select>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-cancel" onclick="closeCategoryModal()">Cancel</button>
+                <button class="btn btn-save" onclick="saveCategory()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin: Add/Edit Workout modal -->
+    <div class="modal" id="workoutModal">
+        <div class="modal-content">
+            <h3 id="workoutModalTitle">Add Workout</h3>
+            <div class="form-group">
+                <label>Category</label>
+                <select id="wCategory" onchange="updateSubgroupsForModal()"></select>
+            </div>
+            <div class="form-group" id="wSubgroupGroup">
+                <label>Subgroup (optional)</label>
+                <select id="wSubgroup">
+                    <option value="">None</option>
+                </select>
+            </div>
+            <div class="form-group" id="wCycleGroup">
+                <label>Cycle</label>
+                <select id="wCycle">
+                    <option value="">None</option>
+                </select>
+            </div>
+            <div class="form-group" id="wSessionGroup">
+                <label>Session Number</label>
+                <input type="number" id="wSession" min="1" placeholder="e.g. 1">
+            </div>
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="wName" placeholder="e.g. Upper Body 1">
+            </div>
+            <div class="form-group">
+                <label>Info / Description</label>
+                <textarea id="wInfo" rows="2" placeholder="e.g. 5 moves x 4 rounds 40s work 20s rest"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Duration (minutes)</label>
+                <input type="number" id="wDuration" min="1" placeholder="e.g. 20">
+            </div>
+            <div class="form-group">
+                <label>Equipment</label>
+                <input type="text" id="wEquipment" placeholder="e.g. Weights, Resistance band">
+            </div>
+            <div class="form-group">
+                <label>Notes / Tips</label>
+                <input type="text" id="wNotes" placeholder="e.g. Cool down finisher">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-cancel" onclick="closeWorkoutModal()">Cancel</button>
+                <button class="btn btn-save" onclick="saveWorkoutAdmin()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin: Add Subgroup modal -->
+    <div class="modal" id="subgroupModal">
+        <div class="modal-content">
+            <h3 id="subgroupModalTitle">Add Subgroup</h3>
+            <div class="form-group">
+                <label>Category</label>
+                <select id="sgCategory"></select>
+            </div>
+            <div class="form-group">
+                <label>Subgroup Name</label>
+                <input type="text" id="sgName" placeholder="e.g. Sunday Stretch">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-cancel" onclick="closeSubgroupModal()">Cancel</button>
+                <button class="btn btn-save" onclick="saveSubgroup()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav" id="mainNav">
+        <button id="homeNavBtn" class="active" onclick="showHome()">
+            <div>🏠</div>Home
+        </button>
+        <button id="historyNavBtn" onclick="showHistory()">
+            <div>📋</div>History
+        </button>
+    </div>
+
+    <script>
+        // ─── SUPABASE SETUP ───────────────────────────────────────────────
+        const SUPABASE_URL = 'https://hebuaabantmnfdxxkaif.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_xzVfo0l-eLpkP4TuUy17KQ_kLLUUScF';
+        const { createClient } = supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // ─── STATE ────────────────────────────────────────────────────────
+        let currentView = 'loading';
+        let selectedType = null;
+        let selectedCycle = null;
+        let selectedWorkout = null;
+        let categories = [];
+        let cycles = [];
+        let subgroups = [];
+        let allWorkouts = [];
+        let history = [];
+        let favorites = [];
+        let favoriteAffirmations = [];
+        let weeklyReflections = [];
+        let dailyAffirmationIndex = 0;
+        let editingCategoryId = null;
+        let editingWorkoutId = null;
+        let editingSubgroupId = null;
+        let adminTab = 'categories';
+
+        // ─── AFFIRMATIONS (stay hardcoded) ───────────────────────────────
+        const affirmations = [
+            "You are stronger than you think, both in body and mind.",
+            "Every movement is progress, no matter how small.",
+            "Your body is capable of amazing things today.",
+            "Rest is part of the journey, not a pause from it.",
+            "You are worthy of the time you invest in yourself.",
+            "This phase of life brings wisdom and strength.",
+            "Listen to your body - it knows what it needs.",
+            "Your consistency matters more than perfection.",
+            "You are creating a life of vitality and joy.",
+            "Breathe deeply. You are exactly where you need to be.",
+            "Your strength grows from showing up, again and again.",
+            "You are evolving beautifully through every season of life.",
+            "Movement is a celebration of what your body can do.",
+            "Today, you choose to honor your wellbeing.",
+            "You deserve the same kindness you give to others.",
+            "Your body is your home - treat it with love.",
+            "Small steps still move you forward.",
+            "You are enough, exactly as you are right now.",
+            "This moment is an opportunity for growth.",
+            "Your journey is uniquely yours - honor it.",
+            "Strength isn't just physical, it's showing up with courage.",
+            "You are building habits that will serve you for life.",
+            "Every breath is a chance to begin again.",
+            "Your resilience is remarkable.",
+            "You are worthy of rest, recovery, and renewal."
+        ];
+
+        // ─── INIT ─────────────────────────────────────────────────────────
+        async function init() {
+            // Check for admin mode
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('admin') === 'true') {
+                await loadAllData();
+                showAdmin();
+                return;
+            }
+            await loadAllData();
+            showHome();
+        }
+
+        async function loadAllData() {
+            try {
+                const [catsRes, cyclesRes, subgroupsRes, workoutsRes, historyRes, favRes, affFavRes, reflectionsRes] = await Promise.all([
+                    db.from('workout_categories').select('*').order('sort_order'),
+                    db.from('workout_cycles').select('*').order('cycle_number'),
+                    db.from('workout_subgroups').select('*').order('sort_order'),
+                    db.from('workouts').select('*').order('sort_order'),
+                    db.from('workout_history').select('*').order('logged_date', { ascending: false }),
+                    db.from('workout_favorites').select('*'),
+                    db.from('affirmation_favorites').select('*'),
+                    db.from('weekly_reflections').select('*').order('week_start', { ascending: false }).limit(6)
+                ]);
+
+                categories = catsRes.data || [];
+                cycles = cyclesRes.data || [];
+                subgroups = subgroupsRes.data || [];
+                allWorkouts = workoutsRes.data || [];
+                history = historyRes.data || [];
+                favorites = (favRes.data || []).map(f => f.workout_slug);
+                favoriteAffirmations = (affFavRes.data || []).map(f => f.affirmation_text);
+                weeklyReflections = reflectionsRes.data || [];
+
+                // Clean history older than 3 months
+                const threeMonthsAgo = new Date();
+                threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                const oldEntries = history.filter(h => new Date(h.logged_date) < threeMonthsAgo);
+                if (oldEntries.length > 0) {
+                    await db.from('workout_history').delete().in('id', oldEntries.map(e => e.id));
+                    history = history.filter(h => new Date(h.logged_date) >= threeMonthsAgo);
+                }
+
+                initDailyAffirmation();
+            } catch (err) {
+                console.error('Error loading data:', err);
+            }
+        }
+
+        // ─── AFFIRMATION LOGIC ────────────────────────────────────────────
+        function initDailyAffirmation() {
+            const today = new Date().toDateString();
+            const savedDate = localStorage.getItem('dailyAffirmationDate');
+            if (savedDate !== today) {
+                dailyAffirmationIndex = Math.floor(Math.random() * affirmations.length);
+                localStorage.setItem('dailyAffirmationDate', today);
+                localStorage.setItem('dailyAffirmationIndex', dailyAffirmationIndex);
+            } else {
+                dailyAffirmationIndex = parseInt(localStorage.getItem('dailyAffirmationIndex') || '0');
+            }
+        }
+
+        function getDailyAffirmation() {
+            return affirmations[dailyAffirmationIndex];
+        }
+
+        function nextAffirmation() {
+            dailyAffirmationIndex = (dailyAffirmationIndex + 1) % affirmations.length;
+            localStorage.setItem('dailyAffirmationIndex', dailyAffirmationIndex);
+            renderTypes();
+        }
+
+        async function toggleAffirmationFavorite() {
+            const affirmation = affirmations[dailyAffirmationIndex];
+            const isFav = favoriteAffirmations.includes(affirmation);
+            if (isFav) {
+                await db.from('affirmation_favorites').delete().eq('affirmation_text', affirmation);
+                favoriteAffirmations = favoriteAffirmations.filter(a => a !== affirmation);
+            } else {
+                await db.from('affirmation_favorites').insert({ affirmation_text: affirmation });
+                favoriteAffirmations.push(affirmation);
+            }
+            renderTypes();
+        }
+
+        function isAffirmationFavorite() {
+            return favoriteAffirmations.includes(affirmations[dailyAffirmationIndex]);
+        }
+
+        // ─── FAVORITES ────────────────────────────────────────────────────
+        async function toggleFavorite(workoutSlug, event) {
+            event.stopPropagation();
+            const isFav = favorites.includes(workoutSlug);
+            if (isFav) {
+                await db.from('workout_favorites').delete().eq('workout_slug', workoutSlug);
+                favorites = favorites.filter(f => f !== workoutSlug);
+            } else {
+                await db.from('workout_favorites').insert({ workout_slug: workoutSlug });
+                favorites.push(workoutSlug);
+            }
+            if (currentView === 'workouts') showWorkouts();
+            else if (currentView === 'sessions') showSessions();
+        }
+
+        function isFavorite(workoutSlug) {
+            return favorites.includes(workoutSlug);
+        }
+
+        // ─── WEEKLY PROGRESS ──────────────────────────────────────────────
+        function getWeekStart() {
+            const now = new Date();
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(now.setDate(diff));
+            monday.setHours(0, 0, 0, 0);
+            return monday;
+        }
+
+        function getThisWeeksWorkouts(categorySlug) {
+            const weekStart = getWeekStart();
+            return history.filter(h => {
+                return h.category_slug === categorySlug && new Date(h.logged_date) >= weekStart;
+            });
+        }
+
+        function getWeeklyProgress() {
+            let completed = 0;
+            let total = 0;
+            categories.forEach(cat => {
+                const thisWeek = getThisWeeksWorkouts(cat.slug).length;
+                total += cat.weekly_goal;
+                completed += Math.min(thisWeek, cat.weekly_goal);
+            });
+            return { completed, total };
+        }
+
+        function getLastForCategory(categorySlug) {
+            return history.filter(h => h.category_slug === categorySlug)
+                .sort((a, b) => new Date(b.logged_date) - new Date(a.logged_date))[0];
+        }
+
+        function getLastForWorkout(workoutId, cycleNumber = null, sessionNumber = null) {
+            return history.filter(h => {
+                if (cycleNumber !== null && h.cycle_number !== cycleNumber) return false;
+                if (sessionNumber !== null && h.session_number !== sessionNumber) return false;
+                return h.workout_id === workoutId;
+            }).sort((a, b) => new Date(b.logged_date) - new Date(a.logged_date))[0];
+        }
+
+        function getNextHiit() {
+            const hiitHistory = history.filter(h => h.category_slug === 'hiit')
+                .sort((a, b) => new Date(b.logged_date) - new Date(a.logged_date));
+            const last = hiitHistory[0];
+            if (!last) return { cycle: 1, session: 1 };
+            const maxSession = 5;
+            const maxCycle = cycles.filter(c => c.category_slug === 'hiit').length;
+            if (last.session_number < maxSession) return { cycle: last.cycle_number, session: last.session_number + 1 };
+            if (last.cycle_number < maxCycle) return { cycle: last.cycle_number + 1, session: 1 };
+            return { cycle: 1, session: 1 };
+        }
+
+        // ─── VIEW MANAGEMENT ──────────────────────────────────────────────
+        function hideAll() {
+            document.querySelectorAll('.container').forEach(el => el.classList.add('hidden'));
+            document.getElementById('backBtn').classList.add('hidden');
+            document.getElementById('headerTitle').textContent = 'Workout Tracker';
+        }
+
+        function showHome() {
+            hideAll();
+            currentView = 'home';
+            selectedType = null;
+            selectedCycle = null;
+            selectedWorkout = null;
+            document.getElementById('homeView').classList.remove('hidden');
+            document.getElementById('homeNavBtn').classList.add('active');
+            document.getElementById('historyNavBtn').classList.remove('active');
+            document.getElementById('mainNav').classList.remove('hidden');
+            renderTypes();
+        }
+
+        function renderTypes() {
+            const progress = getWeeklyProgress();
+            const affirmation = getDailyAffirmation();
+            const isFav = isAffirmationFavorite();
+            const list = document.getElementById('typesList');
+
+            const affirmationHtml = `<div class="affirmation-card">
+                <div class="affirmation-text">"${affirmation}"</div>
+                <div class="affirmation-actions">
+                    <button class="affirmation-btn affirmation-heart ${isFav ? 'active' : ''}" onclick="toggleAffirmationFavorite()">
+                        ${isFav ? '❤️' : '🤍'}
+                    </button>
+                    <button class="affirmation-next" onclick="nextAffirmation()">See another →</button>
+                </div>
+            </div>`;
+
+            const summaryHtml = `<div class="weekly-summary">
+                <div class="big">${progress.completed} of ${progress.total}</div>
+                <div class="small">Weekly workouts completed</div>
+            </div>`;
+
+            const cardsHtml = categories.map(cat => {
+                const last = getLastForCategory(cat.slug);
+                const thisWeek = getThisWeeksWorkouts(cat.slug).length;
+                const goal = cat.weekly_goal;
+                const next = cat.has_cycles ? getNextHiit() : null;
+
+                let cardClass = 'card';
+                let badgeClass = 'goal-badge pending';
+                let badgeText = `0/${goal}`;
+
+                if (thisWeek >= goal) {
+                    cardClass = 'card completed';
+                    badgeClass = 'goal-badge complete';
+                    badgeText = '✓ Done';
+                } else if (thisWeek > 0) {
+                    cardClass = 'card partial';
+                    badgeClass = 'goal-badge partial';
+                    badgeText = `${thisWeek}/${goal}`;
+                }
+
+                let lastText = '';
+                if (last) {
+                    lastText = `<small>Last: ${new Date(last.logged_date).toLocaleDateString()}`;
+                    if (last.cycle_number) lastText += ` - Cycle ${last.cycle_number} Session ${last.session_number}`;
+                    lastText += '</small>';
+                }
+
+                let nextText = '';
+                if (next) nextText = `<small style="color: #14b8a6;">Next: Cycle ${next.cycle} Session ${next.session}</small>`;
+
+                return `<div class="${cardClass}" onclick="selectType('${cat.slug}')">
+                    <div class="${badgeClass}">${badgeText}</div>
+                    <h3>${cat.name}</h3>
+                    ${lastText}${nextText}
+                </div>`;
+            }).join('');
+
+            list.innerHTML = affirmationHtml + summaryHtml + cardsHtml;
+        }
+
+        function selectType(slug) {
+            selectedType = categories.find(c => c.slug === slug);
+            if (selectedType.has_cycles) {
+                showCycles();
+            } else {
+                showWorkouts();
+            }
+        }
+
+        function showCycles() {
+            hideAll();
+            currentView = 'cycles';
+            document.getElementById('cyclesView').classList.remove('hidden');
+            document.getElementById('backBtn').classList.remove('hidden');
+            document.getElementById('cyclesTitle').textContent = selectedType.name;
+            document.getElementById('cyclesSubtitle').textContent = selectedType.description;
+
+            const next = getNextHiit();
+            const categoryCycles = cycles.filter(c => c.category_slug === selectedType.slug);
+
+            const list = document.getElementById('cyclesList');
+            list.innerHTML = `<div style="margin-bottom: 20px; padding: 12px; background: #f0fdfa; border-radius: 8px; border-left: 4px solid #14b8a6;">
+                <div style="font-size: 14px; font-weight: 600; color: #0f766e; margin-bottom: 4px;">Next up:</div>
+                <div style="font-size: 13px; color: #134e4a;">Cycle ${next.cycle} Session ${next.session}</div>
+            </div>` + categoryCycles.map(cycle => {
+                const lastInCycle = history.filter(h => h.category_slug === selectedType.slug && h.cycle_number === cycle.cycle_number)
+                    .sort((a, b) => new Date(b.logged_date) - new Date(a.logged_date))[0];
+                let lastText = '';
+                if (lastInCycle) lastText = `<small>Last: Session ${lastInCycle.session_number} - ${new Date(lastInCycle.logged_date).toLocaleDateString()}</small>`;
+                const workoutCount = allWorkouts.filter(w => w.cycle_id === cycle.id).length;
+                return `<div class="card" onclick="selectCycle(${cycle.id}, ${cycle.cycle_number})">
+                    <h3>${cycle.name}</h3>
+                    <p>${workoutCount} sessions</p>
+                    ${lastText}
+                </div>`;
+            }).join('');
+        }
+
+        function selectCycle(cycleId, cycleNumber) {
+            selectedCycle = { id: cycleId, number: cycleNumber };
+            showSessions();
+        }
+
+        function showSessions() {
+            hideAll();
+            currentView = 'sessions';
+            document.getElementById('sessionsView').classList.remove('hidden');
+            document.getElementById('backBtn').classList.remove('hidden');
+            document.getElementById('sessionsTitle').textContent = `Cycle ${selectedCycle.number}`;
+
+            const cycleWorkouts = allWorkouts.filter(w => w.cycle_id === selectedCycle.id)
+                .sort((a, b) => a.sort_order - b.sort_order);
+
+            const list = document.getElementById('sessionsList');
+            list.innerHTML = cycleWorkouts.map(workout => {
+                const last = history.filter(h =>
+                    h.workout_id === workout.id &&
+                    h.cycle_number === selectedCycle.number &&
+                    h.session_number === workout.session_number
+                ).sort((a, b) => new Date(b.logged_date) - new Date(a.logged_date))[0];
+
+                const favStar = isFavorite(workout.slug) ? 'active' : 'inactive';
+                let lastText = '';
+                if (last) lastText = `<small>Last: ${new Date(last.logged_date).toLocaleDateString()}</small>`;
+
+                return `<div class="card" onclick='selectSessionWorkout(${workout.id})'>
+                    <button class="favorite-star ${favStar}" onclick='toggleFavorite("${workout.slug}", event)'>★</button>
+                    <div class="goal-badge pending">${workout.duration}m</div>
+                    <h3>Session ${workout.session_number}</h3>
+                    <p>${workout.info || ''}</p>
+                    ${workout.equipment ? `<div class="equipment">Equipment: ${workout.equipment}</div>` : ''}
+                    ${workout.notes ? `<div class="badge">💡 ${workout.notes}</div>` : ''}
+                    ${lastText}
+                </div>`;
+            }).join('');
+        }
+
+        function selectSessionWorkout(workoutId) {
+            selectedWorkout = allWorkouts.find(w => w.id === workoutId);
+            openModal();
+        }
+
+        function showWorkouts() {
+            hideAll();
+            currentView = 'workouts';
+            document.getElementById('workoutsView').classList.remove('hidden');
+            document.getElementById('backBtn').classList.remove('hidden');
+            document.getElementById('workoutsTitle').textContent = selectedType.name;
+            document.getElementById('workoutsSubtitle').textContent = selectedType.description || '';
+
+            const categoryWorkouts = allWorkouts.filter(w => w.category_slug === selectedType.slug && !w.cycle_id)
+                .sort((a, b) => a.sort_order - b.sort_order);
+
+            const categorySubgroups = subgroups.filter(s => s.category_slug === selectedType.slug)
+                .sort((a, b) => a.sort_order - b.sort_order);
+
+            const list = document.getElementById('workoutsList');
+
+            if (categoryWorkouts.length === 0 && categorySubgroups.length === 0) {
+                list.innerHTML = '<div class="empty-state">No workouts yet.<br>Add some in the admin panel!</div>';
+                return;
+            }
+
+            if (categorySubgroups.length > 0) {
+                let html = '';
+                categorySubgroups.forEach(sg => {
+                    const sgWorkouts = categoryWorkouts.filter(w => w.subgroup_id === sg.id);
+                    if (sgWorkouts.length === 0) return;
+                    html += `<div class="workout-group"><div class="workout-group-title">${sg.name}</div>`;
+                    html += sgWorkouts.map(w => renderWorkoutCard(w)).join('');
+                    html += '</div>';
+                });
+                // Ungrouped workouts
+                const ungrouped = categoryWorkouts.filter(w => !w.subgroup_id);
+                if (ungrouped.length > 0) {
+                    html += ungrouped.map(w => renderWorkoutCard(w)).join('');
+                }
+                list.innerHTML = html;
+            } else {
+                list.innerHTML = categoryWorkouts.map(w => renderWorkoutCard(w)).join('');
+            }
+        }
+
+        function renderWorkoutCard(workout) {
+            const last = history.filter(h => h.workout_id === workout.id)
+                .sort((a, b) => new Date(b.logged_date) - new Date(a.logged_date))[0];
+            const favStar = isFavorite(workout.slug) ? 'active' : 'inactive';
+            let lastText = '';
+            if (last) lastText = `<small>Last: ${new Date(last.logged_date).toLocaleDateString()}</small>`;
+            return `<div class="card" onclick='selectWorkout(${workout.id})'>
+                <button class="favorite-star ${favStar}" onclick='toggleFavorite("${workout.slug}", event)'>★</button>
+                <div class="goal-badge pending">${workout.duration}m</div>
+                <h3>${workout.name}</h3>
+                <p>${workout.info || ''}</p>
+                ${workout.equipment ? `<div class="equipment">Equipment: ${workout.equipment}</div>` : ''}
+                ${workout.notes ? `<div class="badge">💡 ${workout.notes}</div>` : ''}
+                ${lastText}
+            </div>`;
+        }
+
+        function selectWorkout(workoutId) {
+            selectedWorkout = allWorkouts.find(w => w.id === workoutId);
+            openModal();
+        }
+
+        // ─── LOG MODAL ────────────────────────────────────────────────────
+        function openModal() {
+            document.getElementById('logDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('logEquipment').value = selectedWorkout.equipment || '';
+            document.getElementById('logNotes').value = '';
+
+            let detailsHtml = `<strong>${selectedWorkout.name}${selectedWorkout.session_number ? ' (Session ' + selectedWorkout.session_number + ')' : ''}</strong>`;
+            if (selectedWorkout.info) detailsHtml += `<div style="margin-top: 4px;">${selectedWorkout.info}</div>`;
+            if (selectedWorkout.notes) detailsHtml += `<div style="margin-top: 4px; color: #059669;">💡 ${selectedWorkout.notes}</div>`;
+
+            const previousLogs = history.filter(h => h.workout_id === selectedWorkout.id)
+                .sort((a, b) => new Date(b.logged_date) - new Date(a.logged_date))
+                .slice(0, 3);
+
+            if (previousLogs.length > 0) {
+                detailsHtml += `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                    <div style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 8px;">Previous times:</div>`;
+                previousLogs.forEach(log => {
+                    detailsHtml += `<div style="font-size: 12px; color: #374151; margin-bottom: 6px; padding: 6px; background: #f9fafb; border-radius: 4px;">
+                        <div style="font-weight: 500;">${new Date(log.logged_date).toLocaleDateString()}</div>
+                        ${log.equipment ? `<div style="color: #6b7280; margin-top: 2px;">Equipment: ${log.equipment}</div>` : ''}
+                        ${log.notes ? `<div style="color: #6b7280; margin-top: 2px; font-style: italic;">${log.notes}</div>` : ''}
+                    </div>`;
+                });
+                detailsHtml += '</div>';
+            }
+
+            document.getElementById('workoutDetails').innerHTML = detailsHtml;
+            document.getElementById('logModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('logModal').classList.remove('show');
+        }
+
+        async function saveWorkout() {
+            const cat = categories.find(c => c.slug === selectedWorkout.category_slug);
+            const newLog = {
+                workout_id: selectedWorkout.id,
+                workout_name: selectedWorkout.name,
+                workout_info: selectedWorkout.info || '',
+                category_slug: selectedWorkout.category_slug,
+                category_name: cat ? cat.name : '',
+                cycle_number: selectedCycle ? selectedCycle.number : null,
+                session_number: selectedWorkout.session_number || null,
+                logged_date: document.getElementById('logDate').value,
+                duration: selectedWorkout.duration || null,
+                equipment: document.getElementById('logEquipment').value,
+                notes: document.getElementById('logNotes').value
+            };
+
+            const { data, error } = await db.from('workout_history').insert(newLog).select().single();
+            if (!error) {
+                history.unshift(data);
+            }
+            closeModal();
+            showHome();
+        }
+
+        // ─── HISTORY VIEW ─────────────────────────────────────────────────
+        function showHistory() {
+            hideAll();
+            currentView = 'history';
+            document.getElementById('historyView').classList.remove('hidden');
+            document.getElementById('homeNavBtn').classList.remove('active');
+            document.getElementById('historyNavBtn').classList.add('active');
+
+            const list = document.getElementById('historyList');
+
+            let thoughtsHtml = `<div class="weekly-thoughts-section">
+                <div class="weekly-thoughts-header">
+                    <div class="weekly-thoughts-title">Weekly Reflections</div>
+                    <button class="add-thought-btn" onclick="openThoughtModal()">+ Add This Week</button>
+                </div>`;
+
+            if (weeklyReflections.length === 0) {
+                thoughtsHtml += `<p style="text-align: center; color: #6b7280; font-size: 14px; margin-top: 8px;">No reflections yet. Start reflecting on your progress!</p>`;
+            } else {
+                weeklyReflections.forEach(r => {
+                    thoughtsHtml += `<div class="thought-card">
+                        <div class="thought-date">Week of ${new Date(r.week_start).toLocaleDateString()}</div>
+                        <div class="thought-text">${r.reflection_text}</div>
+                    </div>`;
+                });
+            }
+            thoughtsHtml += '</div>';
+
+            if (history.length === 0) {
+                list.innerHTML = thoughtsHtml + '<div class="empty-state">No workouts logged yet.<br>Start tracking your progress!</div>';
+            } else {
+                const workoutsHtml = history.map(w => {
+                    const metaItems = [`📅 ${new Date(w.logged_date).toLocaleDateString()}`];
+                    if (w.duration) metaItems.push(`⏱️ ${w.duration} mins`);
+                    if (w.equipment) metaItems.push(`🏋️ ${w.equipment}`);
+                    return `<div class="history-card">
+                        <h4>${w.workout_name}</h4>
+                        ${w.workout_info ? `<p style="font-size: 13px; color: #6b7280; margin-bottom: 6px;">${w.workout_info}</p>` : ''}
+                        <div class="meta">${metaItems.join(' • ')}</div>
+                        ${w.notes ? `<div class="notes">${w.notes}</div>` : ''}
+                    </div>`;
+                }).join('');
+                list.innerHTML = thoughtsHtml + workoutsHtml;
+            }
+        }
+
+        // ─── REFLECTION MODAL ─────────────────────────────────────────────
+        function openThoughtModal() {
+            document.getElementById('thoughtText').value = '';
+            document.getElementById('thoughtModal').classList.add('show');
+        }
+
+        function closeThoughtModal() {
+            document.getElementById('thoughtModal').classList.remove('show');
+        }
+
+        async function saveThought() {
+            const text = document.getElementById('thoughtText').value.trim();
+            if (!text) return;
+
+            const weekStart = getWeekStart();
+            const { data, error } = await db.from('weekly_reflections').insert({
+                week_start: weekStart.toISOString().split('T')[0],
+                reflection_text: text
+            }).select().single();
+
+            if (!error) {
+                weeklyReflections.unshift(data);
+                weeklyReflections = weeklyReflections.slice(0, 6);
+            }
+
+            closeThoughtModal();
+            showHistory();
+        }
+
+        // ─── NAVIGATION ───────────────────────────────────────────────────
+        function goBack() {
+            if (currentView === 'sessions') showCycles();
+            else if (currentView === 'cycles' || currentView === 'workouts') showHome();
+        }
+
+        // ─── ADMIN PANEL ──────────────────────────────────────────────────
+        function showAdmin() {
+            hideAll();
+            currentView = 'admin';
+            document.getElementById('adminView').classList.remove('hidden');
+            document.getElementById('mainNav').classList.add('hidden');
+            document.getElementById('backBtn').classList.remove('hidden');
+            document.getElementById('headerTitle').textContent = '⚙️ Admin';
+            renderAdmin();
+        }
+
+        function renderAdmin() {
+            const content = document.getElementById('adminContent');
+
+            const tabsHtml = `<div class="admin-tabs">
+                <button class="admin-tab ${adminTab === 'categories' ? 'active' : ''}" onclick="setAdminTab('categories')">Categories</button>
+                <button class="admin-tab ${adminTab === 'subgroups' ? 'active' : ''}" onclick="setAdminTab('subgroups')">Subgroups</button>
+                <button class="admin-tab ${adminTab === 'workouts' ? 'active' : ''}" onclick="setAdminTab('workouts')">Workouts</button>
+            </div>`;
+
+            let bodyHtml = '';
+
+            if (adminTab === 'categories') {
+                bodyHtml = `<div class="admin-section">
+                    <div class="admin-header">
+                        <div class="admin-title">Categories</div>
+                        <button class="admin-btn" onclick="openCategoryModal()">+ Add</button>
+                    </div>
+                    ${categories.map(cat => `
+                        <div class="admin-item">
+                            <div class="admin-item-info">
+                                <div class="admin-item-name">${cat.name}</div>
+                                <div class="admin-item-meta">Weekly goal: ${cat.weekly_goal} • ${cat.has_cycles ? 'Has cycles' : 'No cycles'}</div>
+                            </div>
+                            <div class="admin-item-actions">
+                                <button class="admin-btn small" onclick="openCategoryModal(${cat.id})">Edit</button>
+                                <button class="admin-btn small danger" onclick="deleteCategory(${cat.id})">Del</button>
+                            </div>
+                        </div>`).join('')}
+                </div>`;
+            }
+
+            if (adminTab === 'subgroups') {
+                bodyHtml = `<div class="admin-section">
+                    <div class="admin-header">
+                        <div class="admin-title">Subgroups</div>
+                        <button class="admin-btn" onclick="openSubgroupModal()">+ Add</button>
+                    </div>
+                    ${subgroups.map(sg => {
+                        const cat = categories.find(c => c.slug === sg.category_slug);
+                        return `<div class="admin-item">
+                            <div class="admin-item-info">
+                                <div class="admin-item-name">${sg.name}</div>
+                                <div class="admin-item-meta">${cat ? cat.name : sg.category_slug}</div>
+                            </div>
+                            <div class="admin-item-actions">
+                                <button class="admin-btn small danger" onclick="deleteSubgroup(${sg.id})">Del</button>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>`;
+            }
+
+            if (adminTab === 'workouts') {
+                bodyHtml = `<div class="admin-section">
+                    <div class="admin-header">
+                        <div class="admin-title">Workouts</div>
+                        <button class="admin-btn" onclick="openWorkoutModal()">+ Add</button>
+                    </div>
+                    ${categories.map(cat => {
+                        const catWorkouts = allWorkouts.filter(w => w.category_slug === cat.slug);
+                        if (catWorkouts.length === 0) return '';
+                        return `<div style="margin-bottom: 4px; font-size: 12px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 12px;">${cat.name}</div>` +
+                            catWorkouts.map(w => `
+                                <div class="admin-item">
+                                    <div class="admin-item-info">
+                                        <div class="admin-item-name">${w.name}</div>
+                                        <div class="admin-item-meta">${w.duration ? w.duration + 'min' : ''} ${w.equipment ? '• ' + w.equipment : ''}</div>
+                                    </div>
+                                    <div class="admin-item-actions">
+                                        <button class="admin-btn small" onclick="openWorkoutModal(${w.id})">Edit</button>
+                                        <button class="admin-btn small danger" onclick="deleteWorkoutAdmin(${w.id})">Del</button>
+                                    </div>
+                                </div>`).join('');
+                    }).join('')}
+                </div>`;
+            }
+
+            content.innerHTML = tabsHtml + bodyHtml;
+        }
+
+        function setAdminTab(tab) {
+            adminTab = tab;
+            renderAdmin();
+        }
+
+        // ─── CATEGORY MODAL ───────────────────────────────────────────────
+        function openCategoryModal(id = null) {
+            editingCategoryId = id;
+            document.getElementById('categoryModalTitle').textContent = id ? 'Edit Category' : 'Add Category';
+            if (id) {
+                const cat = categories.find(c => c.id === id);
+                document.getElementById('catName').value = cat.name;
+                document.getElementById('catDescription').value = cat.description || '';
+                document.getElementById('catWeeklyGoal').value = cat.weekly_goal;
+                document.getElementById('catHasCycles').value = cat.has_cycles ? 'true' : 'false';
+            } else {
+                document.getElementById('catName').value = '';
+                document.getElementById('catDescription').value = '';
+                document.getElementById('catWeeklyGoal').value = 1;
+                document.getElementById('catHasCycles').value = 'false';
+            }
+            document.getElementById('categoryModal').classList.add('show');
+        }
+
+        function closeCategoryModal() {
+            document.getElementById('categoryModal').classList.remove('show');
+        }
+
+        async function saveCategory() {
+            const name = document.getElementById('catName').value.trim();
+            if (!name) return;
+            const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            const payload = {
+                name,
+                slug,
+                description: document.getElementById('catDescription').value.trim(),
+                weekly_goal: parseInt(document.getElementById('catWeeklyGoal').value) || 1,
+                has_cycles: document.getElementById('catHasCycles').value === 'true',
+                sort_order: editingCategoryId ? undefined : categories.length + 1
+            };
+
+            if (editingCategoryId) {
+                const { data } = await db.from('workout_categories').update(payload).eq('id', editingCategoryId).select().single();
+                categories = categories.map(c => c.id === editingCategoryId ? data : c);
+            } else {
+                const { data } = await db.from('workout_categories').insert(payload).select().single();
+                categories.push(data);
+            }
+            closeCategoryModal();
+            renderAdmin();
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm('Delete this category? All its workouts will also be deleted.')) return;
+            await db.from('workout_categories').delete().eq('id', id);
+            categories = categories.filter(c => c.id !== id);
+            allWorkouts = allWorkouts.filter(w => w.category_slug !== categories.find(c => c.id === id)?.slug);
+            renderAdmin();
+        }
+
+        // ─── SUBGROUP MODAL ───────────────────────────────────────────────
+        function openSubgroupModal() {
+            document.getElementById('subgroupModalTitle').textContent = 'Add Subgroup';
+            const sgCat = document.getElementById('sgCategory');
+            sgCat.innerHTML = categories.map(c => `<option value="${c.slug}">${c.name}</option>`).join('');
+            document.getElementById('sgName').value = '';
+            document.getElementById('subgroupModal').classList.add('show');
+        }
+
+        function closeSubgroupModal() {
+            document.getElementById('subgroupModal').classList.remove('show');
+        }
+
+        async function saveSubgroup() {
+            const name = document.getElementById('sgName').value.trim();
+            const category_slug = document.getElementById('sgCategory').value;
+            if (!name) return;
+            const { data } = await db.from('workout_subgroups').insert({
+                name, category_slug,
+                sort_order: subgroups.filter(s => s.category_slug === category_slug).length + 1
+            }).select().single();
+            subgroups.push(data);
+            closeSubgroupModal();
+            renderAdmin();
+        }
+
+        async function deleteSubgroup(id) {
+            if (!confirm('Delete this subgroup?')) return;
+            await db.from('workout_subgroups').delete().eq('id', id);
+            subgroups = subgroups.filter(s => s.id !== id);
+            renderAdmin();
+        }
+
+        // ─── WORKOUT ADMIN MODAL ──────────────────────────────────────────
+        function openWorkoutModal(id = null) {
+            editingWorkoutId = id;
+            document.getElementById('workoutModalTitle').textContent = id ? 'Edit Workout' : 'Add Workout';
+
+            const catSelect = document.getElementById('wCategory');
+            catSelect.innerHTML = categories.map(c => `<option value="${c.slug}">${c.name}</option>`).join('');
+
+            if (id) {
+                const w = allWorkouts.find(w => w.id === id);
+                catSelect.value = w.category_slug;
+                updateSubgroupsForModal();
+                updateCyclesForModal();
+                document.getElementById('wName').value = w.name;
+                document.getElementById('wInfo').value = w.info || '';
+                document.getElementById('wDuration').value = w.duration || '';
+                document.getElementById('wEquipment').value = w.equipment || '';
+                document.getElementById('wNotes').value = w.notes || '';
+                document.getElementById('wSession').value = w.session_number || '';
+                setTimeout(() => {
+                    if (w.subgroup_id) document.getElementById('wSubgroup').value = w.subgroup_id;
+                    if (w.cycle_id) document.getElementById('wCycle').value = w.cycle_id;
+                }, 50);
+            } else {
+                updateSubgroupsForModal();
+                updateCyclesForModal();
+                document.getElementById('wName').value = '';
+                document.getElementById('wInfo').value = '';
+                document.getElementById('wDuration').value = '';
+                document.getElementById('wEquipment').value = '';
+                document.getElementById('wNotes').value = '';
+                document.getElementById('wSession').value = '';
+            }
+
+            document.getElementById('workoutModal').classList.add('show');
+        }
+
+        function updateSubgroupsForModal() {
+            const slug = document.getElementById('wCategory').value;
+            const catSubgroups = subgroups.filter(s => s.category_slug === slug);
+            const sel = document.getElementById('wSubgroup');
+            sel.innerHTML = '<option value="">None</option>' + catSubgroups.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            updateCyclesForModal();
+        }
+
+        function updateCyclesForModal() {
+            const slug = document.getElementById('wCategory').value;
+            const cat = categories.find(c => c.slug === slug);
+            const catCycles = cycles.filter(c => c.category_slug === slug);
+            const cycleGroup = document.getElementById('wCycleGroup');
+            const sessionGroup = document.getElementById('wSessionGroup');
+            if (cat && cat.has_cycles && catCycles.length > 0) {
+                cycleGroup.classList.remove('hidden');
+                sessionGroup.classList.remove('hidden');
+                document.getElementById('wCycle').innerHTML = '<option value="">None</option>' + catCycles.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            } else {
+                cycleGroup.classList.add('hidden');
+                sessionGroup.classList.add('hidden');
+            }
+        }
+
+        function closeWorkoutModal() {
+            document.getElementById('workoutModal').classList.remove('show');
+        }
+
+        async function saveWorkoutAdmin() {
+            const name = document.getElementById('wName').value.trim();
+            if (!name) return;
+            const category_slug = document.getElementById('wCategory').value;
+            const subgroup_id = document.getElementById('wSubgroup').value || null;
+            const cycle_id = document.getElementById('wCycle').value || null;
+            const session_number = document.getElementById('wSession').value || null;
+            const slug = editingWorkoutId
+                ? allWorkouts.find(w => w.id === editingWorkoutId).slug
+                : (category_slug + '_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now());
+
+            const payload = {
+                name, category_slug, slug,
+                subgroup_id: subgroup_id ? parseInt(subgroup_id) : null,
+                cycle_id: cycle_id ? parseInt(cycle_id) : null,
+                session_number: session_number ? parseInt(session_number) : null,
+                info: document.getElementById('wInfo').value.trim(),
+                duration: parseInt(document.getElementById('wDuration').value) || null,
+                equipment: document.getElementById('wEquipment').value.trim(),
+                notes: document.getElementById('wNotes').value.trim(),
+                sort_order: editingWorkoutId ? undefined : allWorkouts.filter(w => w.category_slug === category_slug).length + 1
+            };
+
+            if (editingWorkoutId) {
+                const { data } = await db.from('workouts').update(payload).eq('id', editingWorkoutId).select().single();
+                allWorkouts = allWorkouts.map(w => w.id === editingWorkoutId ? data : w);
+            } else {
+                const { data } = await db.from('workouts').insert(payload).select().single();
+                allWorkouts.push(data);
+            }
+            closeWorkoutModal();
+            renderAdmin();
+        }
+
+        async function deleteWorkoutAdmin(id) {
+            if (!confirm('Delete this workout?')) return;
+            await db.from('workouts').delete().eq('id', id);
+            allWorkouts = allWorkouts.filter(w => w.id !== id);
+            renderAdmin();
+        }
+
+        // ─── START ────────────────────────────────────────────────────────
+        document.getElementById('loadingView').classList.remove('hidden');
+        init();
+    </script>
+</body>
+</html>
