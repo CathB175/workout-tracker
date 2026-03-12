@@ -95,6 +95,17 @@
     </style>
 </head>
 <body>
+    <div id="login-form">
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <button onclick="signIn()">Login</button>
+</div>
+
+<div id="content" style="display:none;">
+  <!-- Your actual site content goes here -->
+  <h1>Welcome back!</h1>
+  <div id="data-container"></div>
+</div>
     <div class="header">
         <button class="back-btn hidden" id="backBtn" onclick="goBack()">← Back</button>
         <h1 id="headerTitle">Workout Tracker</h1>
