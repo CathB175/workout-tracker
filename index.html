@@ -437,6 +437,7 @@
         let selectedCycle = null;
         let selectedWorkout = null;
         let categories = [];
+        let allCategories = [];
         let cycles = [];
         let subgroups = [];
         let allWorkouts = [];
@@ -504,7 +505,8 @@
                     db.from('weekly_reflections').select('*').order('week_start', { ascending: false }).limit(6)
                 ]);
 
-                categories = catsRes.data || [];
+               allCategories = catsRes.data || [];
+                categories = allCategories.filter(c => c.is_active !== false);
                 cycles = cyclesRes.data || [];
                 subgroups = subgroupsRes.data || [];
                 allWorkouts = workoutsRes.data || [];
@@ -926,9 +928,13 @@
             let bodyHtml = '';
             if (adminTab === 'categories') {
                 bodyHtml = `<div class="admin-section"><div class="admin-header"><div class="admin-title">Categories</div><button class="admin-btn" onclick="openCategoryModal()">+ Add</button></div>
-                    ${categories.map(cat => `<div class="admin-item">
-                        <div class="admin-item-info"><div class="admin-item-name">${cat.name}</div><div class="admin-item-meta">Weekly goal: ${cat.weekly_goal} • ${cat.has_cycles?'Has cycles':'No cycles'}</div></div>
-                        <div class="admin-item-actions"><button class="admin-btn small" onclick="openCategoryModal(${cat.id})">Edit</button><button class="admin-btn small danger" onclick="deleteCategory(${cat.id})">Del</button></div>
+                   ${allCategories.map(cat => `<div class="admin-item" style="opacity:${cat.is_active===false?'0.5':'1'}">
+                        <div class="admin-item-info"><div class="admin-item-name">${cat.name} ${cat.is_active===false?'<span style="font-size:11px;color:#9ca3af;">(inactive)</span>':''}</div><div class="admin-item-meta">Weekly goal: ${cat.weekly_goal} • ${cat.has_cycles?'Has cycles':'No cycles'}</div></div>
+                        <div class="admin-item-actions">
+                            <button class="admin-btn small" style="background:${cat.is_active===false?'#6b7280':'#14b8a6'}" onclick="toggleCategoryActive(${cat.id}, ${cat.is_active!==false})">${cat.is_active===false?'Activate':'Pause'}</button>
+                            <button class="admin-btn small" onclick="openCategoryModal(${cat.id})">Edit</button>
+                            <button class="admin-btn small danger" onclick="deleteCategory(${cat.id})">Del</button>
+                        </div>
                     </div>`).join('')}</div>`;
             }
             if (adminTab === 'subgroups') {
@@ -957,6 +963,15 @@
         }
 
         function setAdminTab(tab) { adminTab = tab; renderAdmin(); }
+       
+        async function toggleCategoryActive(id, currentState) {
+    const newState = !currentState;
+    await db.from('workout_categories').update({ is_active: newState }).eq('id', id);
+    const cat = allCategories.find(c => c.id === id);
+    if (cat) cat.is_active = newState;
+    categories = allCategories.filter(c => c.is_active !== false);
+    renderAdmin();
+}
 
         function openCategoryModal(id = null) {
             editingCategoryId = id;
@@ -982,7 +997,7 @@
             const name = document.getElementById('catName').value.trim();
             if (!name) return;
             const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-            const payload = { name, slug, description: document.getElementById('catDescription').value.trim(), weekly_goal: parseInt(document.getElementById('catWeeklyGoal').value) || 1, has_cycles: document.getElementById('catHasCycles').value === 'true', sort_order: editingCategoryId ? undefined : categories.length + 1 };
+          const payload = { name, slug, description: document.getElementById('catDescription').value.trim(), weekly_goal: parseInt(document.getElementById('catWeeklyGoal').value) || 1, has_cycles: document.getElementById('catHasCycles').value === 'true', sort_order: editingCategoryId ? undefined : categories.length + 1, is_active: true };
             if (editingCategoryId) {
                 const { data } = await db.from('workout_categories').update(payload).eq('id', editingCategoryId).select().single();
                 categories = categories.map(c => c.id === editingCategoryId ? data : c);
