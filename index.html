@@ -334,6 +334,10 @@
                 <label>Notes / Tips</label>
                 <input type="text" id="wNotes" placeholder="e.g. Cool down finisher">
             </div>
+            <div class="form-group">
+    <label>Link (YouTube or website URL)</label>
+    <input type="text" id="wLink" placeholder="e.g. https://www.youtube.com/watch?v=...">
+</div>
             <div class="btn-group">
                 <button class="btn btn-cancel" onclick="closeWorkoutModal()">Cancel</button>
                 <button class="btn btn-save" onclick="saveWorkoutAdmin()">Save</button>
@@ -735,6 +739,7 @@
                     <p>${workout.info || ''}</p>
                     ${workout.equipment ? `<div class="equipment">Equipment: ${workout.equipment}</div>` : ''}
                     ${workout.notes ? `<div class="badge">💡 ${workout.notes}</div>` : ''}
+                    ${workout.link ? `<a href="${workout.link}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block;margin-top:6px;font-size:12px;color:#14b8a6;font-weight:600;">▶ Open link</a>` : ''}
                     ${lastText}
                 </div>`;
             }).join('');
@@ -784,6 +789,7 @@
                 <h3>${workout.name}</h3><p>${workout.info || ''}</p>
                 ${workout.equipment ? `<div class="equipment">Equipment: ${workout.equipment}</div>` : ''}
                 ${workout.notes ? `<div class="badge">💡 ${workout.notes}</div>` : ''}
+${workout.link ? `<a href="${workout.link}" target="_blank" onclick="event.stopPropagation()" style="display:inline-block;margin-top:6px;font-size:12px;color:#14b8a6;font-weight:600;">▶ Open link</a>` : ''}
                 ${lastText}
             </div>`;
         }
@@ -1053,6 +1059,7 @@
                 document.getElementById('wDuration').value = w.duration || '';
                 document.getElementById('wEquipment').value = w.equipment || '';
                 document.getElementById('wNotes').value = w.notes || '';
+                document.getElementById('wLink').value = w.link || '';
                 document.getElementById('wSession').value = w.session_number || '';
                 setTimeout(() => {
                     if (w.subgroup_id) document.getElementById('wSubgroup').value = w.subgroup_id;
@@ -1060,7 +1067,7 @@
                 }, 50);
             } else {
                 updateSubgroupsForModal(); updateCyclesForModal();
-                ['wName','wInfo','wDuration','wEquipment','wNotes','wSession'].forEach(id => document.getElementById(id).value = '');
+                ['wName','wInfo','wDuration','wEquipment','wNotes','wSession','wLink'].forEach(id => document.getElementById(id).value = '');
             }
             document.getElementById('workoutModal').classList.add('show');
         }
@@ -1096,7 +1103,7 @@
             const cycle_id = document.getElementById('wCycle').value || null;
             const session_number = document.getElementById('wSession').value || null;
             const slug = editingWorkoutId ? allWorkouts.find(w => w.id === editingWorkoutId).slug : (category_slug + '_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now());
-            const payload = { name, category_slug, slug, subgroup_id: subgroup_id ? parseInt(subgroup_id) : null, cycle_id: cycle_id ? parseInt(cycle_id) : null, session_number: session_number ? parseInt(session_number) : null, info: document.getElementById('wInfo').value.trim(), duration: parseInt(document.getElementById('wDuration').value) || null, equipment: document.getElementById('wEquipment').value.trim(), notes: document.getElementById('wNotes').value.trim(), sort_order: editingWorkoutId ? undefined : allWorkouts.filter(w => w.category_slug === category_slug).length + 1 };
+            const payload = { name, category_slug, slug, subgroup_id: subgroup_id ? parseInt(subgroup_id) : null, cycle_id: cycle_id ? parseInt(cycle_id) : null, session_number: session_number ? parseInt(session_number) : null, info: document.getElementById('wInfo').value.trim(), duration: parseInt(document.getElementById('wDuration').value) || null, equipment: document.getElementById('wEquipment').value.trim(), notes: document.getElementById('wNotes').value.trim(), link: document.getElementById('wLink').value.trim() || null, sort_order: editingWorkoutId ? undefined : allWorkouts.filter(w => w.category_slug === category_slug).length + 1 };
             if (editingWorkoutId) {
                 const { data } = await db.from('workouts').update(payload).eq('id', editingWorkoutId).select().single();
                 allWorkouts = allWorkouts.map(w => w.id === editingWorkoutId ? data : w);
