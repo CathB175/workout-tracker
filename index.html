@@ -1019,6 +1019,11 @@ ${workout.link ? `<a href="${workout.link}" target="_blank" onclick="event.stopP
                 has_cycles: document.getElementById('catHasCycles').value === 'true'
             };
             if (!existing) {
+                const duplicate = allCategories.find(c => c.slug === slug);
+                if (duplicate) {
+                    alert('A category with this name already exists' + (duplicate.is_active === false ? ' but is paused. You can reactivate it from the Categories list.' : '. Please choose a different name.') );
+                    return;
+                }
                 payload.slug = slug;
                 payload.sort_order = allCategories.length + 1;
                 payload.is_active = true;
@@ -1027,7 +1032,12 @@ ${workout.link ? `<a href="${workout.link}" target="_blank" onclick="event.stopP
                 ? await db.from('workout_categories').update(payload).eq('id', existing.id).select().single()
                 : await db.from('workout_categories').insert(payload).select().single();
             if (result.error || !result.data) {
-                alert('Category could not be saved: ' + (result.error?.message || 'No data returned'));
+                const message = result.error?.message || 'No data returned';
+                if (result.error?.code === '23505' && message.includes('workout_categories_slug_key')) {
+                    alert('A category with this name already exists in the database. Check the Categories list, including paused categories, or choose a different name.');
+                } else {
+                    alert('Category could not be saved: ' + message);
+                }
                 return;
             }
             if (existing) {
