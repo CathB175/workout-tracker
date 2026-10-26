@@ -758,20 +758,22 @@
             document.getElementById('workoutsTitle').textContent = selectedType.name;
             document.getElementById('workoutsSubtitle').textContent = selectedType.description || '';
             const categoryWorkouts = allWorkouts.filter(w => w.category_slug === selectedType.slug && !w.cycle_id).sort((a, b) => a.sort_order - b.sort_order);
-            const categorySubgroups = subgroups.filter(s => s.category_slug === selectedType.slug).sort((a, b) => a.sort_order - b.sort_order);
+            const categorySubgroups = subgroups.filter(s => s.category_slug === selectedType.slug && s.is_active !== false).sort((a, b) => a.sort_order - b.sort_order);
             const list = document.getElementById('workoutsList');
-            if (categoryWorkouts.length === 0 && categorySubgroups.length === 0) {
+            if ((selectedType.slug === 'studio-era' && categorySubgroups.length === 0) || (categoryWorkouts.length === 0 && categorySubgroups.length === 0)) {
                 list.innerHTML = '<div class="empty-state">No workouts yet.<br>Add some in the admin panel!</div>';
                 return;
             }
             if (categorySubgroups.length > 0) {
+                // Studio Era shows only the active programme's workouts.
+                // Other categories retain their existing ungrouped-workout behaviour.
                 let html = '';
                 categorySubgroups.forEach(sg => {
                     const sgWorkouts = categoryWorkouts.filter(w => w.subgroup_id === sg.id);
                     if (!sgWorkouts.length) return;
                     html += `<div class="workout-group"><div class="workout-group-title">${sg.name}</div>` + sgWorkouts.map(w => renderWorkoutCard(w)).join('') + '</div>';
                 });
-                const ungrouped = categoryWorkouts.filter(w => !w.subgroup_id);
+                const ungrouped = selectedType.slug === 'studio-era' ? [] : categoryWorkouts.filter(w => !w.subgroup_id);
                 if (ungrouped.length) html += ungrouped.map(w => renderWorkoutCard(w)).join('');
                 list.innerHTML = html;
             } else {
@@ -949,8 +951,8 @@ ${workout.link ? `<a href="${workout.link}" target="_blank" onclick="event.stopP
                     ${subgroups.map(sg => {
                         const cat = categories.find(c => c.slug === sg.category_slug);
                         return `<div class="admin-item">
-                            <div class="admin-item-info"><div class="admin-item-name">${sg.name}</div><div class="admin-item-meta">${cat?cat.name:sg.category_slug}</div></div>
-                            <div class="admin-item-actions"><button class="admin-btn small" onclick="openSubgroupModal(${sg.id})">Edit</button><button class="admin-btn small danger" onclick="deleteSubgroup(${sg.id})">Del</button></div>
+                            <div class="admin-item-info"><div class="admin-item-name">${sg.name}${sg.is_active===false?' (paused)':''}</div><div class="admin-item-meta">${cat?cat.name:sg.category_slug}</div></div>
+                            <div class="admin-item-actions"><button class="admin-btn small" style="background:${sg.is_active===false?'#6b7280':'#14b8a6'}" onclick="toggleSubgroupActive(${sg.id})">${sg.is_active===false?'Activate':'Pause'}</button><button class="admin-btn small" onclick="openSubgroupModal(${sg.id})">Edit</button><button class="admin-btn small danger" onclick="deleteSubgroup(${sg.id})">Del</button></div>
                         </div>`;
                     }).join('')}</div>`;
             }
@@ -1054,6 +1056,19 @@ ${workout.link ? `<a href="${workout.link}" target="_blank" onclick="event.stopP
             if (!confirm('Delete this category? All its workouts will also be deleted.')) return;
             await db.from('workout_categories').delete().eq('id', id);
             categories = categories.filter(c => c.id !== id);
+            renderAdmin();
+        }
+
+        async function toggleSubgroupActive(id) {
+            const subgroup = subgroups.find(s => s.id === id);
+            if (!subgroup) return;
+            const newState = subgroup.is_active === false;
+            const { data, error } = await db.from('workout_subgroups').update({ is_active: newState }).eq('id', id).select().single();
+            if (error || !data) {
+                alert('Could not change subgroup status: ' + (error?.message || 'Unknown error'));
+                return;
+            }
+            subgroups = subgroups.map(s => s.id === id ? data : s);
             renderAdmin();
         }
 
