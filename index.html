@@ -1002,17 +1002,42 @@ ${workout.link ? `<a href="${workout.link}" target="_blank" onclick="event.stopP
 
         async function saveCategory() {
             const name = document.getElementById('catName').value.trim();
-            if (!name) return;
-            const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-          const payload = { name, slug, description: document.getElementById('catDescription').value.trim(), weekly_goal: parseInt(document.getElementById('catWeeklyGoal').value) || 1, has_cycles: document.getElementById('catHasCycles').value === 'true', sort_order: editingCategoryId ? undefined : categories.length + 1, is_active: true };
-            if (editingCategoryId) {
-                const { data } = await db.from('workout_categories').update(payload).eq('id', editingCategoryId).select().single();
-                categories = categories.map(c => c.id === editingCategoryId ? data : c);
-            } else {
-                const { data } = await db.from('workout_categories').insert(payload).select().single();
-                categories.push(data);
+            if (!name) {
+                alert('Please enter a category name.');
+                return;
             }
-            closeCategoryModal(); renderAdmin();
+            const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            if (!slug) {
+                alert('Please use letters or numbers in the category name.');
+                return;
+            }
+            const existing = editingCategoryId !== null ? allCategories.find(c => c.id === editingCategoryId) : null;
+            const payload = {
+                name,
+                description: document.getElementById('catDescription').value.trim(),
+                weekly_goal: parseInt(document.getElementById('catWeeklyGoal').value) || 1,
+                has_cycles: document.getElementById('catHasCycles').value === 'true'
+            };
+            if (!existing) {
+                payload.slug = slug;
+                payload.sort_order = allCategories.length + 1;
+                payload.is_active = true;
+            }
+            const result = existing
+                ? await db.from('workout_categories').update(payload).eq('id', existing.id).select().single()
+                : await db.from('workout_categories').insert(payload).select().single();
+            if (result.error || !result.data) {
+                alert('Category could not be saved: ' + (result.error?.message || 'No data returned'));
+                return;
+            }
+            if (existing) {
+                allCategories = allCategories.map(c => c.id === existing.id ? result.data : c);
+            } else {
+                allCategories.push(result.data);
+            }
+            categories = allCategories.filter(c => c.is_active !== false);
+            closeCategoryModal();
+            renderAdmin();
         }
 
         async function deleteCategory(id) {
