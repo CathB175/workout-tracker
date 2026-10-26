@@ -950,7 +950,7 @@ ${workout.link ? `<a href="${workout.link}" target="_blank" onclick="event.stopP
                         const cat = categories.find(c => c.slug === sg.category_slug);
                         return `<div class="admin-item">
                             <div class="admin-item-info"><div class="admin-item-name">${sg.name}</div><div class="admin-item-meta">${cat?cat.name:sg.category_slug}</div></div>
-                            <div class="admin-item-actions"><button class="admin-btn small danger" onclick="deleteSubgroup(${sg.id})">Del</button></div>
+                            <div class="admin-item-actions"><button class="admin-btn small" onclick="openSubgroupModal(${sg.id})">Edit</button><button class="admin-btn small danger" onclick="deleteSubgroup(${sg.id})">Del</button></div>
                         </div>`;
                     }).join('')}</div>`;
             }
@@ -1022,21 +1022,66 @@ ${workout.link ? `<a href="${workout.link}" target="_blank" onclick="event.stopP
             renderAdmin();
         }
 
-        function openSubgroupModal() {
-            document.getElementById('subgroupModalTitle').textContent = 'Add Subgroup';
-            document.getElementById('sgCategory').innerHTML = categories.map(c => `<option value="${c.slug}">${c.name}</option>`).join('');
-            document.getElementById('sgName').value = '';
+        function openSubgroupModal(id = null) {
+            editingSubgroupId = id;
+            const subgroup = id === null ? null : subgroups.find(s => s.id === id);
+            if (id !== null && !subgroup) {
+                alert('Subgroup not found. Please refresh and try again.');
+                return;
+            }
+            document.getElementById('subgroupModalTitle').textContent = subgroup ? 'Edit Subgroup' : 'Add Subgroup';
+            const categorySelect = document.getElementById('sgCategory');
+            categorySelect.innerHTML = allCategories.map(c => `<option value="${c.slug}">${c.name}</option>`).join('');
+            categorySelect.value = subgroup ? subgroup.category_slug : (categories[0]?.slug || '');
+            document.getElementById('sgName').value = subgroup ? subgroup.name : '';
             document.getElementById('subgroupModal').classList.add('show');
         }
-        function closeSubgroupModal() { document.getElementById('subgroupModal').classList.remove('show'); }
+        function closeSubgroupModal() {
+            document.getElementById('subgroupModal').classList.remove('show');
+            editingSubgroupId = null;
+        }
 
         async function saveSubgroup() {
             const name = document.getElementById('sgName').value.trim();
             const category_slug = document.getElementById('sgCategory').value;
-            if (!name) return;
-            const { data } = await db.from('workout_subgroups').insert({ name, category_slug, sort_order: subgroups.filter(s => s.category_slug === category_slug).length + 1 }).select().single();
-            subgroups.push(data);
-            closeSubgroupModal(); renderAdmin();
+            if (!name || !category_slug) {
+                alert('Please enter a subgroup name and choose a category.');
+                return;
+            }
+            const current = editingSubgroupId === null ? null : subgroups.find(s => s.id === editingSubgroupId);
+            if (editingSubgroupId !== null && !current) {
+                alert('Subgroup not found. Please refresh and try again.');
+                return;
+            }
+            // Changing category on an occupied subgroup needs an explicit workout move.
+            // Block it here rather than leaving workouts in the old category and invisible.
+            if (current && current.category_slug !== category_slug &&
+                allWorkouts.some(w => String(w.subgroup_id) === String(current.id))) {
+                alert('This subgroup contains workouts. To change its category, first move its workouts to the new category using Workouts > Edit.');
+                return;
+            }
+            const payload = { name, category_slug };
+            if (current && current.category_slug !== category_slug) {
+                payload.sort_order = subgroups.filter(s => s.category_slug === category_slug).length + 1;
+            }
+            let result;
+            if (current) {
+                result = await db.from('workout_subgroups').update(payload).eq('id', current.id).select().single();
+            } else {
+                payload.sort_order = subgroups.filter(s => s.category_slug === category_slug).length + 1;
+                result = await db.from('workout_subgroups').insert(payload).select().single();
+            }
+            if (result.error || !result.data) {
+                alert('Unable to save subgroup: ' + (result.error?.message || 'Unknown error'));
+                return;
+            }
+            if (current) {
+                subgroups = subgroups.map(s => s.id === current.id ? result.data : s);
+            } else {
+                subgroups.push(result.data);
+            }
+            closeSubgroupModal();
+            renderAdmin();
         }
 
         async function deleteSubgroup(id) {
